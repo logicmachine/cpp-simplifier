@@ -94,6 +94,10 @@ private:
 		Traverse(decl->getUnderlyingType(), depth);
 	}
 	void TraverseDetail(const clang::CXXRecordDecl *decl, int depth){
+		if(!decl->hasDefinition()){
+			Traverse(decl->getDefinition(), depth);
+			return;
+		}
 		for(const auto child : decl->decls()){
 			// アクセス指定子
 			if(clang::isa<clang::AccessSpecDecl>(child)){ Traverse(child, depth); }
