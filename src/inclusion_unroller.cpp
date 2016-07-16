@@ -162,7 +162,7 @@ private:
 			}
 		}else{
 			if(m_source_cache.find(path) == m_source_cache.end()){
-				m_source_cache.emplace(path, load_text_file(filename));
+				m_source_cache.emplace(path, load_text_file(path));
 			}
 		}
 	}
