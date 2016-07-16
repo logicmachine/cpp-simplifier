@@ -235,7 +235,7 @@ private:
 	// Types
 	//------------------------------------------------------------------------
 	void Traverse(const clang::QualType &type, int depth){
-		Traverse(type.getTypePtr(), depth);
+		Traverse(type.getTypePtrOrNull(), depth);
 	}
 	void Traverse(const clang::Type *type, int depth){
 		if(!type){ return; }
@@ -430,6 +430,7 @@ private:
 #endif
 		bool result = false;
 		result |= TestAndMark<clang::AccessSpecDecl>(decl, depth);
+		result |= TestAndMark<clang::NamespaceDecl>(decl, depth);
 
 		result |= TestAndMark<clang::TypedefDecl>(decl, depth);
 		result |= TestAndMark<clang::RecordDecl>(decl, depth);
@@ -445,6 +446,17 @@ private:
 	bool MarkDetail(const clang::AccessSpecDecl *decl, int){
 		MarkRange(decl->getSourceRange());
 		return true;
+	}
+	bool MarkDetail(const clang::NamespaceDecl *decl, int depth){
+		bool result = false;
+		for(const auto child : decl->decls()){
+			result |= MarkRecursive(child, depth);
+		}
+		if(result){
+			MarkRange(clang::SourceRange(decl->getLocStart(), EndOfHead(decl)));
+			MarkRange(clang::SourceRange(decl->getRBraceLoc()));
+		}
+		return result;
 	}
 
 	bool MarkDetail(const clang::TypedefDecl *decl, int depth){
