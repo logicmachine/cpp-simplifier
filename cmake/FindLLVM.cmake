@@ -8,7 +8,7 @@
 
 find_program(
 	LLVM_CONFIG_PROGRAM
-	NAMES "llvm-config" "llvm-config-3.8" "llvm-config-3.7")
+	NAMES "llvm-config-3.8" "llvm-config-3.7")
 
 if(LLVM_CONFIG_PROGRAM)
 	# Extract include directories from cxxflags
