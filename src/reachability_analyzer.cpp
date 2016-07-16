@@ -433,6 +433,7 @@ private:
 		result |= TestAndMark<clang::NamespaceDecl>(decl, depth);
 
 		result |= TestAndMark<clang::TypedefDecl>(decl, depth);
+		result |= TestAndMark<clang::TypeAliasDecl>(decl, depth);
 		result |= TestAndMark<clang::RecordDecl>(decl, depth);
 		result |= TestAndMark<clang::ClassTemplateDecl>(decl, depth);
 
@@ -459,7 +460,11 @@ private:
 		return result;
 	}
 
-	bool MarkDetail(const clang::TypedefDecl *decl, int depth){
+	bool MarkDetail(const clang::TypedefDecl *decl, int){
+		MarkRange(decl->getSourceRange());
+		return true;
+	}
+	bool MarkDetail(const clang::TypeAliasDecl *decl, int){
 		MarkRange(decl->getSourceRange());
 		return true;
 	}
