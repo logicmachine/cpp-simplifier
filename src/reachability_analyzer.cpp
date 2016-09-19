@@ -430,6 +430,7 @@ private:
 #endif
 		bool result = false;
 		result |= TestAndMark<clang::AccessSpecDecl>(decl, depth);
+		result |= TestAndMark<clang::UsingDirectiveDecl>(decl, depth);
 		result |= TestAndMark<clang::NamespaceDecl>(decl, depth);
 
 		result |= TestAndMark<clang::TypedefDecl>(decl, depth);
@@ -445,6 +446,10 @@ private:
 	}
 
 	bool MarkDetail(const clang::AccessSpecDecl *decl, int){
+		MarkRange(decl->getSourceRange());
+		return true;
+	}
+	bool MarkDetail(const clang::UsingDirectiveDecl *decl, int){
 		MarkRange(decl->getSourceRange());
 		return true;
 	}
