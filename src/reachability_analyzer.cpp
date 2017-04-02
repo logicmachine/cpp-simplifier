@@ -437,6 +437,7 @@ private:
 		result |= TestAndMark<clang::TypeAliasDecl>(decl, depth);
 		result |= TestAndMark<clang::RecordDecl>(decl, depth);
 		result |= TestAndMark<clang::ClassTemplateDecl>(decl, depth);
+		result |= TestAndMark<clang::ClassTemplateSpecializationDecl>(decl, depth);
 
 		result |= TestAndMark<clang::FieldDecl>(decl, depth);
 		result |= TestAndMark<clang::FunctionDecl>(decl, depth);
@@ -492,6 +493,12 @@ private:
 			MarkRange(clang::SourceRange(decl->getLocStart(), template_tail));
 		}
 		return result;
+	}
+	bool MarkDetail(const clang::ClassTemplateSpecializationDecl *decl, int depth){
+		const auto template_head = decl->getSourceRange().getBegin();
+		const auto template_tail = decl->getOuterLocStart();
+		MarkRange(clang::SourceRange(template_head, template_tail));
+		return true;
 	}
 
 	bool MarkDetail(const clang::FieldDecl *decl, int depth){
