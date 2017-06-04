@@ -160,6 +160,10 @@ private:
 	void TraverseDetail(const clang::VarDecl *decl, int depth){
 		// 初期化式
 		if(decl->hasInit()){ Traverse(decl->getInit(), depth); }
+		// 型情報
+		if(decl->getTypeSourceInfo()){
+			Traverse(decl->getTypeSourceInfo()->getType(), depth);
+		}
 	}
 	void TraverseDetail(const clang::ParmVarDecl *decl, int depth){
 		// デフォルト引数
@@ -291,6 +295,8 @@ private:
 		Traverse(type->getDecl(), depth);
 	}
 	void TraverseDetail(const clang::TemplateSpecializationType *type, int depth){
+		const auto t = type->getTemplateName();
+		Traverse(t.getAsTemplateDecl(), depth);
 		// テンプレート引数
 		for(unsigned int i = 0; i < type->getNumArgs(); ++i){
 			Traverse(type->getArgs()[i], depth);
@@ -435,6 +441,7 @@ private:
 
 		result |= TestAndMark<clang::TypedefDecl>(decl, depth);
 		result |= TestAndMark<clang::TypeAliasDecl>(decl, depth);
+		result |= TestAndMark<clang::TypeAliasTemplateDecl>(decl, depth);
 		result |= TestAndMark<clang::RecordDecl>(decl, depth);
 		result |= TestAndMark<clang::ClassTemplateDecl>(decl, depth);
 		result |= TestAndMark<clang::ClassTemplateSpecializationDecl>(decl, depth);
@@ -471,6 +478,10 @@ private:
 		return true;
 	}
 	bool MarkDetail(const clang::TypeAliasDecl *decl, int){
+		MarkRange(decl->getSourceRange());
+		return true;
+	}
+	bool MarkDetail(const clang::TypeAliasTemplateDecl *decl, int){
 		MarkRange(decl->getSourceRange());
 		return true;
 	}
