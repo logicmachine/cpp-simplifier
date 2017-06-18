@@ -1,11 +1,29 @@
 from __future__ import print_function
 import os, sys, re, subprocess;
+import clang.cindex
 
 def print_success(name):
 	print('\033[32m[ PASSED ]\033[m %s' % name)
 
 def print_failed(name):
 	print('\033[31m[ FAILED ]\033[m %s' % name)
+
+def tokenize(input_path):
+	index = clang.cindex.Index.create()
+	tu = index.parse(input_path, args=['-std=c++11'])
+	tokens = tu.get_tokens(extent=tu.cursor.extent)
+	return '\n'.join([t.spelling for t in tokens]) + '\n'
+
+def run_simplify(minifier_path, input_path):
+	proc = subprocess.Popen([minifier_path, input_path], stdout=subprocess.PIPE)
+	return proc.communicate()[0].decode('utf-8')
+
+def run_tokenized_simplify(minifier_path, input_path):
+	source = tokenize(input_path)
+	proc = subprocess.Popen(
+		[minifier_path, '-'], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+	return proc.communicate(source)[0].decode('utf-8')
+
 
 if __name__ == '__main__':
 	if len(sys.argv) < 2:
@@ -33,9 +51,19 @@ if __name__ == '__main__':
 		test_name = filepath[len(test_directory):]
 		input_path = filepath + '.in.cpp'
 		expect_path = filepath + '.out.cpp'
-		proc = subprocess.Popen([minifier_path, input_path], stdout=subprocess.PIPE)
+		# normal
 		expect = ''.join([s.decode('utf-8') for s in open(expect_path, 'rb').readlines()])
-		actual = proc.communicate()[0].decode('utf-8')
+		actual = run_simplify(minifier_path, input_path)
+		if expect == actual:
+			print_success(test_name)
+			passed_tests.append(test_name)
+		else:
+			print_failed(test_name)
+			failed_tests.append(test_name)
+		# tokenized
+		test_name += ' (tokenized)'
+		expect = tokenize(expect_path)
+		actual = run_tokenized_simplify(minifier_path, input_path)
 		if expect == actual:
 			print_success(test_name)
 			passed_tests.append(test_name)

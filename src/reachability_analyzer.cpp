@@ -5,6 +5,8 @@
 #include <clang/AST/DeclTemplate.h>
 #include "reachability_analyzer.hpp"
 
+// #define DEBUG_DUMP_AST
+
 class ReachabilityAnalyzer::ASTConsumer : public clang::ASTConsumer {
 
 private:
@@ -114,6 +116,12 @@ private:
 	void TraverseDetail(const clang::ClassTemplateSpecializationDecl *decl, int depth){
 		// 特殊化元クラステンプレート
 		Traverse(decl->getSpecializedTemplate(), depth);
+		// 特殊化元が部分特殊化されたクラステンプレートの場合
+		const auto from = decl->getInstantiatedFrom();
+		if(from.is<clang::ClassTemplatePartialSpecializationDecl *>()){
+			Traverse(
+				from.get<clang::ClassTemplatePartialSpecializationDecl *>(), depth);
+		}
 	}
 	void TraverseDetail(const clang::TemplateDecl *decl, int depth){
 		// テンプレート引数
@@ -380,6 +388,14 @@ private:
 		const auto main_file_id = m_source_manager->getMainFileID();
 		const auto begin = range.getBegin();
 		const auto end = range.getEnd();
+#ifdef DEBUG_DUMP_AST
+		std::cerr << "Mark: "
+		          << range.getBegin().printToString(*m_source_manager)
+		          << std::endl;
+		std::cerr << "      "
+		          << range.getEnd().printToString(*m_source_manager)
+		          << std::endl;
+#endif
 		if(m_source_manager->getFileID(begin) != main_file_id){ return; }
 		const auto begin_line =
 			m_source_manager->getPresumedLineNumber(begin) - 1;
@@ -388,6 +404,82 @@ private:
 		for(unsigned int i = begin_line; i <= end_line; ++i){
 			m_marker->mark(i);
 		}
+	}
+
+	void MarkRange(
+		const clang::SourceLocation &begin,
+		const clang::SourceLocation &end)
+	{
+		MarkRange(clang::SourceRange(begin, end));
+	}
+
+	clang::SourceLocation FindRBrace(const clang::DeclContext *decl_ctx){
+		if(clang::isa<clang::NamespaceDecl>(decl_ctx)){
+			const auto namespace_decl =
+				clang::dyn_cast<clang::NamespaceDecl>(decl_ctx);
+			return PreviousLine(namespace_decl->getRBraceLoc());
+		}else if(clang::isa<clang::ClassTemplateSpecializationDecl>(decl_ctx)){
+			const auto cts_decl =
+				clang::dyn_cast<clang::ClassTemplateSpecializationDecl>(decl_ctx);
+			const auto from = cts_decl->getInstantiatedFrom();
+			if(from.is<clang::ClassTemplatePartialSpecializationDecl *>()){
+				const auto ctps_decl =
+					from.get<clang::ClassTemplatePartialSpecializationDecl *>();
+				if(ctps_decl){
+					return PreviousLine(ctps_decl->getRBraceLoc());
+				}
+			}else{
+				const auto ct_decl = from.get<clang::ClassTemplateDecl *>();
+				if(ct_decl){
+					const auto templated_decl = ct_decl->getTemplatedDecl();
+					return PreviousLine(templated_decl->getRBraceLoc());
+				}
+			}
+		}else if(clang::isa<clang::RecordDecl>(decl_ctx)){
+			const auto record_decl =
+				clang::dyn_cast<clang::RecordDecl>(decl_ctx);
+			return PreviousLine(record_decl->getRBraceLoc());
+		}else{
+			const auto main_file_id = m_source_manager->getMainFileID();
+			return m_source_manager->getLocForEndOfFile(main_file_id);
+		}
+	}
+
+	clang::SourceLocation DeclEnd(const clang::Decl *decl){
+		const auto next_explicit_decl = [](const clang::Decl *decl){
+			decl = decl->getNextDeclInContext();
+			while(decl && decl->isImplicit()){
+				decl = decl->getNextDeclInContext();
+			}
+			return decl;
+		};
+		auto next = next_explicit_decl(decl);
+		if(next){ return PreviousLine(next->getLocStart()); }
+		const auto main_file_id = m_source_manager->getMainFileID();
+		const auto eof = m_source_manager->getLocForEndOfFile(main_file_id);
+		if(clang::isa<clang::ClassTemplateSpecializationDecl>(decl)){
+			const auto cts_decl =
+				clang::dyn_cast<clang::ClassTemplateSpecializationDecl>(decl);
+			if(cts_decl->isExplicitSpecialization()){ return eof; }
+			return DeclEnd(cts_decl->getSpecializedTemplate());
+		}
+		if(clang::isa<clang::CXXRecordDecl>(decl)){
+			const auto record_decl =
+				clang::dyn_cast<clang::CXXRecordDecl>(decl);
+			if(record_decl->getDescribedClassTemplate()){
+				return DeclEnd(record_decl->getDescribedClassTemplate());
+			}
+		}
+		if(clang::isa<clang::CXXMethodDecl>(decl)){
+			const auto method_decl =
+				clang::dyn_cast<clang::CXXMethodDecl>(decl);
+			if(method_decl->getDescribedFunctionTemplate()){
+				return DeclEnd(method_decl->getDescribedFunctionTemplate());
+			}else if(method_decl->getPrimaryTemplate()){
+				return DeclEnd(method_decl->getPrimaryTemplate());
+			}
+		}
+		return FindRBrace(decl->getDeclContext());
 	}
 
 	clang::SourceLocation EndOfHead(const clang::Decl *decl){
@@ -434,6 +526,7 @@ private:
 			          << std::endl;
 		}
 #endif
+		if(decl->isImplicit()){ return false; }
 		bool result = false;
 		result |= TestAndMark<clang::AccessSpecDecl>(decl, depth);
 		result |= TestAndMark<clang::UsingDirectiveDecl>(decl, depth);
@@ -454,11 +547,11 @@ private:
 	}
 
 	bool MarkDetail(const clang::AccessSpecDecl *decl, int){
-		MarkRange(decl->getSourceRange());
+		MarkRange(decl->getLocStart(), DeclEnd(decl));
 		return true;
 	}
 	bool MarkDetail(const clang::UsingDirectiveDecl *decl, int){
-		MarkRange(decl->getSourceRange());
+		MarkRange(decl->getLocStart(), DeclEnd(decl));
 		return true;
 	}
 	bool MarkDetail(const clang::NamespaceDecl *decl, int depth){
@@ -468,26 +561,26 @@ private:
 		}
 		if(result){
 			MarkRange(clang::SourceRange(decl->getLocStart(), EndOfHead(decl)));
-			MarkRange(clang::SourceRange(decl->getRBraceLoc()));
+			MarkRange(decl->getRBraceLoc(), DeclEnd(decl));
 		}
 		return result;
 	}
 
 	bool MarkDetail(const clang::TypedefDecl *decl, int){
-		MarkRange(decl->getSourceRange());
+		MarkRange(decl->getLocStart(), DeclEnd(decl));
 		return true;
 	}
 	bool MarkDetail(const clang::TypeAliasDecl *decl, int){
-		MarkRange(decl->getSourceRange());
+		MarkRange(decl->getLocStart(), DeclEnd(decl));
 		return true;
 	}
 	bool MarkDetail(const clang::TypeAliasTemplateDecl *decl, int){
-		MarkRange(decl->getSourceRange());
+		MarkRange(decl->getLocStart(), DeclEnd(decl));
 		return true;
 	}
 	bool MarkDetail(const clang::RecordDecl *decl, int depth){
 		MarkRange(clang::SourceRange(decl->getOuterLocStart(), EndOfHead(decl)));
-		MarkRange(clang::SourceRange(decl->getRBraceLoc()));
+		MarkRange(decl->getRBraceLoc(), DeclEnd(decl));
 		for(const auto child : decl->decls()){ MarkRecursive(child, depth); }
 		return true;
 	}
@@ -513,11 +606,11 @@ private:
 	}
 
 	bool MarkDetail(const clang::FieldDecl *decl, int depth){
-		MarkRange(decl->getSourceRange());
+		MarkRange(decl->getLocStart(), DeclEnd(decl));
 		return true;
 	}
 	bool MarkDetail(const clang::FunctionDecl *decl, int depth){
-		MarkRange(decl->getSourceRange());
+		MarkRange(decl->getLocStart(), DeclEnd(decl));
 		return true;
 	}
 	bool MarkDetail(const clang::FunctionTemplateDecl *decl, int depth){
@@ -535,7 +628,7 @@ private:
 		return result;
 	}
 	bool MarkDetail(const clang::VarDecl *decl, int depth){
-		MarkRange(decl->getSourceRange());
+		MarkRange(decl->getLocStart(), DeclEnd(decl));
 		return true;
 	}
 

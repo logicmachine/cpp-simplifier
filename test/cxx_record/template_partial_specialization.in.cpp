@@ -5,8 +5,13 @@ struct A {
 template <typename T>
 struct A<T> {
 	void foo(){ }
+	template <int X>
+	int bar(){
+		return X;
+	}
 };
 int main(){
 	A<int> a;
+	a.bar<10>();
 	return 0;
 }
