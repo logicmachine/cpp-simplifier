@@ -31,4 +31,5 @@ addons:
     - llvm-3.8-dev
     - llvm-3.8-runtime
     - lldb-3.8-dev
+    - python-clang-3.8
 sudo: false
