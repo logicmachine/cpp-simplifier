@@ -479,6 +479,15 @@ private:
 				return DeclEnd(method_decl->getPrimaryTemplate());
 			}
 		}
+		if(clang::isa<clang::FunctionDecl>(decl)){
+			const auto func_decl =
+				clang::dyn_cast<clang::FunctionDecl>(decl);
+			if(func_decl->getDescribedFunctionTemplate()){
+				return DeclEnd(func_decl->getDescribedFunctionTemplate());
+			}else if(func_decl->getPrimaryTemplate()){
+				return DeclEnd(func_decl->getPrimaryTemplate());
+			}
+		}
 		return FindRBrace(decl->getDeclContext());
 	}
 
