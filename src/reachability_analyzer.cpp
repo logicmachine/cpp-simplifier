@@ -152,7 +152,9 @@ private:
 			Traverse(decl->getPrimaryTemplate(), depth);
 		}
 		// 引数
-		for(const auto param : decl->params()){ Traverse(param, depth); }
+		for(unsigned int i = 0; i < decl->getNumParams(); ++i){
+			Traverse(decl->getParamDecl(i), depth);
+		}
 		// 処理内容
 		if(decl->hasBody()){ Traverse(decl->getBody(), depth); }
 		// 戻り値の型
@@ -426,19 +428,19 @@ private:
 				const auto ctps_decl =
 					from.get<clang::ClassTemplatePartialSpecializationDecl *>();
 				if(ctps_decl){
-					return PreviousLine(ctps_decl->getRBraceLoc());
+					return PreviousLine(ctps_decl->getBraceRange().getEnd());
 				}
 			}else{
 				const auto ct_decl = from.get<clang::ClassTemplateDecl *>();
 				if(ct_decl){
 					const auto templated_decl = ct_decl->getTemplatedDecl();
-					return PreviousLine(templated_decl->getRBraceLoc());
+					return PreviousLine(templated_decl->getBraceRange().getEnd());
 				}
 			}
 		}else if(clang::isa<clang::RecordDecl>(decl_ctx)){
 			const auto record_decl =
 				clang::dyn_cast<clang::RecordDecl>(decl_ctx);
-			return PreviousLine(record_decl->getRBraceLoc());
+			return PreviousLine(record_decl->getBraceRange().getEnd());
 		}else{
 			const auto main_file_id = m_source_manager->getMainFileID();
 			return m_source_manager->getLocForEndOfFile(main_file_id);
@@ -589,7 +591,7 @@ private:
 	}
 	bool MarkDetail(const clang::RecordDecl *decl, int depth){
 		MarkRange(clang::SourceRange(decl->getOuterLocStart(), EndOfHead(decl)));
-		MarkRange(decl->getRBraceLoc(), DeclEnd(decl));
+		MarkRange(decl->getBraceRange().getEnd(), DeclEnd(decl));
 		for(const auto child : decl->decls()){ MarkRecursive(child, depth); }
 		return true;
 	}
