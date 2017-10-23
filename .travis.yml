@@ -11,25 +11,23 @@ script:
 addons:
   apt:
     sources:
-    - george-edison55-precise-backports
     - ubuntu-toolchain-r-test
-    - boost-latest
-    - llvm-toolchain-precise-3.8
+    - llvm-toolchain-trusty-4.0
     packages:
     - gcc-5
     - g++-5
-    - cmake
-    - cmake-data
+    - cmake3
+    - cmake3-data
     - libboost-program-options-dev
-    - clang-3.8
-    - libclang-common-3.8-dev
-    - libclang-3.8-dev
-    - libclang1-3.8
-    - libllvm3.8
-    - lldb-3.8
-    - llvm-3.8
-    - llvm-3.8-dev
-    - llvm-3.8-runtime
-    - lldb-3.8-dev
-    - python-clang-3.8
+    - clang-4.0
+    - libclang-common-4.0-dev
+    - libclang-4.0-dev
+    - libclang1-4.0
+    - libllvm4.0
+    - lldb-4.0
+    - llvm-4.0
+    - llvm-4.0-dev
+    - llvm-4.0-runtime
+    - liblldb-4.0-dev
+    - python-clang-4.0
 sudo: false
