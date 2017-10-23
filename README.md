@@ -47,10 +47,10 @@ int main(){
 ## Installation
 
 ### Prerequisites
-- GNU C++ compiler 4.9
-- LLVM/clang 3.8
+- GNU C++ compiler 5.4
+- LLVM/clang 4.0
 - CMake 3.0
-- Boost 1.55
+- Boost 1.54
 
 ### How to build
 ```
