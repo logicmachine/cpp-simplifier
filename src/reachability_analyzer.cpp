@@ -462,8 +462,11 @@ private:
 		if(clang::isa<clang::ClassTemplateSpecializationDecl>(decl)){
 			const auto cts_decl =
 				clang::dyn_cast<clang::ClassTemplateSpecializationDecl>(decl);
-			if(cts_decl->isExplicitSpecialization()){ return eof; }
-			return DeclEnd(cts_decl->getSpecializedTemplate());
+			if(cts_decl->isExplicitSpecialization()){
+				return DeclEnd(clang::dyn_cast<clang::Decl>(cts_decl->getParent()));
+			}else{
+				return DeclEnd(cts_decl->getSpecializedTemplate());
+			}
 		}
 		if(clang::isa<clang::CXXRecordDecl>(decl)){
 			const auto record_decl =
