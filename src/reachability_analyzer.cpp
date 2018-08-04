@@ -419,7 +419,7 @@ private:
 		if(clang::isa<clang::NamespaceDecl>(decl_ctx)){
 			const auto namespace_decl =
 				clang::dyn_cast<clang::NamespaceDecl>(decl_ctx);
-			return PreviousLine(namespace_decl->getRBraceLoc());
+			return namespace_decl->getRBraceLoc();
 		}else if(clang::isa<clang::ClassTemplateSpecializationDecl>(decl_ctx)){
 			const auto cts_decl =
 				clang::dyn_cast<clang::ClassTemplateSpecializationDecl>(decl_ctx);
@@ -428,19 +428,19 @@ private:
 				const auto ctps_decl =
 					from.get<clang::ClassTemplatePartialSpecializationDecl *>();
 				if(ctps_decl){
-					return PreviousLine(ctps_decl->getBraceRange().getEnd());
+					return ctps_decl->getBraceRange().getEnd();
 				}
 			}else{
 				const auto ct_decl = from.get<clang::ClassTemplateDecl *>();
 				if(ct_decl){
 					const auto templated_decl = ct_decl->getTemplatedDecl();
-					return PreviousLine(templated_decl->getBraceRange().getEnd());
+					return templated_decl->getBraceRange().getEnd();
 				}
 			}
 		}else if(clang::isa<clang::RecordDecl>(decl_ctx)){
 			const auto record_decl =
 				clang::dyn_cast<clang::RecordDecl>(decl_ctx);
-			return PreviousLine(record_decl->getBraceRange().getEnd());
+			return record_decl->getBraceRange().getEnd();
 		}else{
 			const auto main_file_id = m_source_manager->getMainFileID();
 			return m_source_manager->getLocForEndOfFile(main_file_id);
@@ -493,7 +493,15 @@ private:
 				return DeclEnd(func_decl->getPrimaryTemplate());
 			}
 		}
-		return FindRBrace(decl->getDeclContext());
+		const auto rbrace = FindRBrace(decl->getDeclContext());
+		const auto rbrace_line = m_source_manager->getPresumedLineNumber(rbrace);
+		const auto decl_end = decl->getSourceRange().getEnd();
+		const auto decl_end_line = m_source_manager->getPresumedLineNumber(decl_end);
+		if(rbrace_line > decl_end_line){
+			return PreviousLine(rbrace);
+		}else{
+			return decl_end;
+		}
 	}
 
 	clang::SourceLocation EndOfHead(const clang::Decl *decl){
