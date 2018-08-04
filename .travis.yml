@@ -12,22 +12,22 @@ addons:
   apt:
     sources:
     - ubuntu-toolchain-r-test
-    - llvm-toolchain-trusty-4.0
+    - llvm-toolchain-trusty-6.0
     packages:
     - gcc-5
     - g++-5
     - cmake3
     - cmake3-data
     - libboost-program-options-dev
-    - clang-4.0
-    - libclang-common-4.0-dev
-    - libclang-4.0-dev
-    - libclang1-4.0
-    - libllvm4.0
-    - lldb-4.0
-    - llvm-4.0
-    - llvm-4.0-dev
-    - llvm-4.0-runtime
-    - liblldb-4.0-dev
-    - python-clang-4.0
+    - clang-6.0
+    - libclang-common-6.0-dev
+    - libclang-6.0-dev
+    - libclang1-6.0
+    - libllvm6.0
+    - lldb-6.0
+    - llvm-6.0
+    - llvm-6.0-dev
+    - llvm-6.0-runtime
+    - liblldb-6.0-dev
+    - python-clang-6.0
 sudo: false
