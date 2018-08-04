@@ -48,7 +48,7 @@ int main(){
 
 ### Prerequisites
 - GNU C++ compiler 5.4
-- LLVM/clang 4.0
+- LLVM/clang 6.0
 - CMake 3.0
 - Boost 1.54
 
