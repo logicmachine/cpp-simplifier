@@ -1,4 +1,5 @@
 #include <clang/Tooling/Tooling.h>
+#include <clang/Tooling/CompilationDatabase.h>
 #include <clang/Frontend/FrontendActions.h>
 #include "syntax_checker.hpp"
 

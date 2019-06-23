@@ -2,6 +2,7 @@
 #include <memory>
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Tooling/Tooling.h>
+#include <clang/Tooling/CompilationDatabase.h>
 #include <clang/Tooling/ArgumentsAdjusters.h>
 #include "simplifier.hpp"
 #include "reachability_analyzer.hpp"

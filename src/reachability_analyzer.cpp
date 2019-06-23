@@ -456,7 +456,7 @@ private:
 			return decl;
 		};
 		auto next = next_explicit_decl(decl);
-		if(next){ return PreviousLine(next->getLocStart()); }
+		if(next){ return PreviousLine(next->getBeginLoc()); }
 		const auto main_file_id = m_source_manager->getMainFileID();
 		const auto eof = m_source_manager->getLocForEndOfFile(main_file_id);
 		if(clang::isa<clang::ClassTemplateSpecializationDecl>(decl)){
@@ -505,7 +505,7 @@ private:
 	}
 
 	clang::SourceLocation EndOfHead(const clang::Decl *decl){
-		auto loc = decl->getLocEnd();
+		auto loc = decl->getEndLoc();
 		if(clang::isa<clang::DeclContext>(decl)){
 			const auto context = clang::dyn_cast<clang::DeclContext>(decl);
 			for(const auto child : context->decls()){
@@ -513,11 +513,11 @@ private:
 				const auto a =
 					m_source_manager->getPresumedLineNumber(loc);
 				const auto b =
-					m_source_manager->getPresumedLineNumber(child->getLocStart());
-				if(b < a){ loc = child->getLocStart(); }
+					m_source_manager->getPresumedLineNumber(child->getBeginLoc());
+				if(b < a){ loc = child->getBeginLoc(); }
 			}
 			const auto a =
-				m_source_manager->getPresumedLineNumber(decl->getLocStart());
+				m_source_manager->getPresumedLineNumber(decl->getBeginLoc());
 			const auto b = m_source_manager->getPresumedLineNumber(loc);
 			if(b > a){ loc = PreviousLine(loc); }
 		}
@@ -569,11 +569,11 @@ private:
 	}
 
 	bool MarkDetail(const clang::AccessSpecDecl *decl, int){
-		MarkRange(decl->getLocStart(), DeclEnd(decl));
+		MarkRange(decl->getBeginLoc(), DeclEnd(decl));
 		return true;
 	}
 	bool MarkDetail(const clang::UsingDirectiveDecl *decl, int){
-		MarkRange(decl->getLocStart(), DeclEnd(decl));
+		MarkRange(decl->getBeginLoc(), DeclEnd(decl));
 		return true;
 	}
 	bool MarkDetail(const clang::NamespaceDecl *decl, int depth){
@@ -582,22 +582,22 @@ private:
 			result |= MarkRecursive(child, depth);
 		}
 		if(result){
-			MarkRange(clang::SourceRange(decl->getLocStart(), EndOfHead(decl)));
+			MarkRange(clang::SourceRange(decl->getBeginLoc(), EndOfHead(decl)));
 			MarkRange(decl->getRBraceLoc(), DeclEnd(decl));
 		}
 		return result;
 	}
 
 	bool MarkDetail(const clang::TypedefDecl *decl, int){
-		MarkRange(decl->getLocStart(), DeclEnd(decl));
+		MarkRange(decl->getBeginLoc(), DeclEnd(decl));
 		return true;
 	}
 	bool MarkDetail(const clang::TypeAliasDecl *decl, int){
-		MarkRange(decl->getLocStart(), DeclEnd(decl));
+		MarkRange(decl->getBeginLoc(), DeclEnd(decl));
 		return true;
 	}
 	bool MarkDetail(const clang::TypeAliasTemplateDecl *decl, int){
-		MarkRange(decl->getLocStart(), DeclEnd(decl));
+		MarkRange(decl->getBeginLoc(), DeclEnd(decl));
 		return true;
 	}
 	bool MarkDetail(const clang::RecordDecl *decl, int depth){
@@ -612,11 +612,11 @@ private:
 			result |= MarkRecursive(spec, depth);
 		}
 		if(result){
-			auto template_tail = decl->getTemplatedDecl()->getLocStart();
-			const auto a = m_source_manager->getPresumedLineNumber(decl->getLocStart());
+			auto template_tail = decl->getTemplatedDecl()->getBeginLoc();
+			const auto a = m_source_manager->getPresumedLineNumber(decl->getBeginLoc());
 			const auto b = m_source_manager->getPresumedLineNumber(template_tail);
 			if(b > a){ template_tail = PreviousLine(template_tail); }
-			MarkRange(clang::SourceRange(decl->getLocStart(), template_tail));
+			MarkRange(clang::SourceRange(decl->getBeginLoc(), template_tail));
 		}
 		return result;
 	}
@@ -628,11 +628,11 @@ private:
 	}
 
 	bool MarkDetail(const clang::FieldDecl *decl, int depth){
-		MarkRange(decl->getLocStart(), DeclEnd(decl));
+		MarkRange(decl->getBeginLoc(), DeclEnd(decl));
 		return true;
 	}
 	bool MarkDetail(const clang::FunctionDecl *decl, int depth){
-		MarkRange(decl->getLocStart(), DeclEnd(decl));
+		MarkRange(decl->getBeginLoc(), DeclEnd(decl));
 		return true;
 	}
 	bool MarkDetail(const clang::FunctionTemplateDecl *decl, int depth){
@@ -641,16 +641,16 @@ private:
 			result |= MarkRecursive(spec, depth);
 		}
 		if(result){
-			auto template_tail = decl->getTemplatedDecl()->getLocStart();
-			const auto a = m_source_manager->getPresumedLineNumber(decl->getLocStart());
+			auto template_tail = decl->getTemplatedDecl()->getBeginLoc();
+			const auto a = m_source_manager->getPresumedLineNumber(decl->getBeginLoc());
 			const auto b = m_source_manager->getPresumedLineNumber(template_tail);
 			if(b > a){ template_tail = PreviousLine(template_tail); }
-			MarkRange(clang::SourceRange(decl->getLocStart(), template_tail));
+			MarkRange(clang::SourceRange(decl->getBeginLoc(), template_tail));
 		}
 		return result;
 	}
 	bool MarkDetail(const clang::VarDecl *decl, int depth){
-		MarkRange(decl->getLocStart(), DeclEnd(decl));
+		MarkRange(decl->getBeginLoc(), DeclEnd(decl));
 		return true;
 	}
 

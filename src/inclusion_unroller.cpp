@@ -7,6 +7,7 @@
 #include <clang/Frontend/FrontendActions.h>
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Tooling/Tooling.h>
+#include <clang/Tooling/CompilationDatabase.h>
 #include <clang/Lex/Preprocessor.h>
 #include "inclusion_unroller.hpp"
 
@@ -40,7 +41,7 @@ private:
 			const clang::FileEntry *file,
 			clang::StringRef,
 			clang::StringRef,
-			const clang::Module *) override
+			const clang::Module *)
 		{
 			m_action->OnInclusionDirective(
 				hash_loc, filename, is_angled, file);
