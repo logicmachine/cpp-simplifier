@@ -445,6 +445,7 @@ private:
 			const auto main_file_id = m_source_manager->getMainFileID();
 			return m_source_manager->getLocForEndOfFile(main_file_id);
 		}
+		return clang::SourceLocation();
 	}
 
 	clang::SourceLocation DeclEnd(const clang::Decl *decl){
@@ -711,7 +712,7 @@ ReachabilityAnalyzerFactory::ReachabilityAnalyzerFactory(
 	, m_marker(std::move(marker))
 { }
 
-clang::FrontendAction *ReachabilityAnalyzerFactory::create(){
-	return new ReachabilityAnalyzer(m_marker);
+std::unique_ptr<clang::FrontendAction> ReachabilityAnalyzerFactory::create(){
+	return std::make_unique<ReachabilityAnalyzer>(m_marker);
 }
 

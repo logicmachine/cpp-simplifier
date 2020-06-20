@@ -36,7 +36,7 @@ public:
 	ReachabilityAnalyzerFactory(
 		std::shared_ptr<ReachabilityMarker> marker);
 
-	virtual clang::FrontendAction *create() override;
+	virtual std::unique_ptr<clang::FrontendAction> create() override;
 
 };
 

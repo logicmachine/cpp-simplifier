@@ -41,7 +41,8 @@ private:
 			const clang::FileEntry *file,
 			clang::StringRef,
 			clang::StringRef,
-			const clang::Module *)
+			const clang::Module *,
+			clang::SrcMgr::CharacteristicKind) override
 		{
 			m_action->OnInclusionDirective(
 				hash_loc, filename, is_angled, file);
@@ -85,8 +86,10 @@ public:
 
 		m_source_cache.clear();
 		m_angled_inclusions.clear();
-		m_source_cache.emplace(m_input_filename, split_text(m_input_content));
-		m_current_source = &m_source_cache[m_input_filename];
+		const std::string input_filename =
+			sm.getFilename(sm.getLocForStartOfFile(sm.getMainFileID()));
+		m_source_cache.emplace(input_filename, split_text(m_input_content));
+		m_current_source = &m_source_cache[input_filename];
 
 		pp.EnterMainSourceFile();
 		std::ostringstream oss;
@@ -187,8 +190,8 @@ public:
 		, m_input_filename(std::move(input_filename))
 	{ }
 
-	virtual clang::FrontendAction *create() override {
-		return new InclusionUnrollingAction(
+	virtual std::unique_ptr<clang::FrontendAction> create() override {
+		return std::make_unique<InclusionUnrollingAction>(
 			m_result_ptr, m_input_content, m_input_filename);
 	}
 
