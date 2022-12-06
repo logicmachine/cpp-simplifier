@@ -161,11 +161,11 @@ private:
 		auto &sm = *m_current_source_manager;
 		const auto from = sm.getFilename(hash_loc).str();
 		if(m_source_cache.find(from) != m_source_cache.end()){
-			if(is_angled){
-				m_angled_inclusions.insert(filename.str());
-			}else if(m_source_cache.find(path) == m_source_cache.end()){
+			//if(is_angled){
+			//	m_angled_inclusions.insert(filename.str());
+			//}else if(m_source_cache.find(path) == m_source_cache.end()){
 				m_source_cache.emplace(path, load_text_file(path));
-			}
+			//}
 		}
 	}
 

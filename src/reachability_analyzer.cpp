@@ -68,20 +68,24 @@ private:
 			}
 		}
 
+		// Ordering here is annoyingly important/brittle
+		// subclasses need to be tested first
 		TestAndTraverse<clang::NamespaceDecl>(decl, depth);
 
 		TestAndTraverse<clang::TypedefNameDecl>(decl, depth);
+			TestAndTraverse<clang::ClassTemplateSpecializationDecl>(decl, depth);
 		TestAndTraverse<clang::CXXRecordDecl>(decl, depth);
-		TestAndTraverse<clang::ClassTemplateSpecializationDecl>(decl, depth);
+		TestAndTraverse<clang::EnumDecl>(decl, depth);
+			TestAndTraverse<clang::ClassTemplateDecl>(decl, depth);
 		TestAndTraverse<clang::TemplateDecl>(decl, depth);
-		TestAndTraverse<clang::ClassTemplateDecl>(decl, depth);
 
+                        TestAndTraverse<clang::ParmVarDecl>(decl, depth);
+                    TestAndTraverse<clang::VarDecl>(decl, depth);
+                    TestAndTraverse<clang::FieldDecl>(decl, depth);
+                    TestAndTraverse<clang::EnumConstantDecl >(decl, depth);
+                        TestAndTraverse<clang::CXXConstructorDecl>(decl, depth);
+                    TestAndTraverse<clang::FunctionDecl>(decl, depth);
 		TestAndTraverse<clang::ValueDecl>(decl, depth);
-		TestAndTraverse<clang::FieldDecl>(decl, depth);
-		TestAndTraverse<clang::FunctionDecl>(decl, depth);
-		TestAndTraverse<clang::CXXConstructorDecl>(decl, depth);
-		TestAndTraverse<clang::VarDecl>(decl, depth);
-		TestAndTraverse<clang::ParmVarDecl>(decl, depth);
 	}
 
 	void TraverseDetail(const clang::NamespaceDecl *decl, int depth){
@@ -113,6 +117,13 @@ private:
 			Traverse(decl->getDestructor(), depth);
 		}
 	}
+        // FIXME: remove? after tests...
+	void TraverseDetail(const clang::EnumDecl *decl, int depth){
+		for(const auto child : decl->decls()) {
+			Traverse(child, depth);
+		}
+	}
+
 	void TraverseDetail(const clang::ClassTemplateSpecializationDecl *decl, int depth){
 		// 特殊化元クラステンプレート
 		Traverse(decl->getSpecializedTemplate(), depth);
@@ -145,7 +156,15 @@ private:
 		if(decl->hasInClassInitializer()){
 			Traverse(decl->getInClassInitializer(), depth);
 		}
+		if(decl->getTypeSourceInfo()){
+                        constantArrayHack(*decl->getTypeSourceInfo(), depth);
+		}
 	}
+        // FIXME: remove? after tests...
+	void TraverseDetail(const clang::EnumConstantDecl *decl, int depth){
+		Traverse(decl->getType(), depth);
+	}
+
 	void TraverseDetail(const clang::FunctionDecl *decl, int depth){
 		// テンプレート関数の特殊化元
 		if(decl->isFunctionTemplateSpecialization()){
@@ -172,12 +191,23 @@ private:
 		if(decl->hasInit()){ Traverse(decl->getInit(), depth); }
 		// 型情報
 		if(decl->getTypeSourceInfo()){
-			Traverse(decl->getTypeSourceInfo()->getType(), depth);
+			constantArrayHack(*decl->getTypeSourceInfo(), depth);
 		}
 	}
+        void constantArrayHack(const clang::TypeSourceInfo& typeSourceInfo, int depth){
+                const auto& type = typeSourceInfo.getType();
+                if (clang::isa<clang::ConstantArrayType>(type.getTypePtrOrNull())){
+                        Traverse(typeSourceInfo.getTypeLoc(), depth);
+                } else {
+                        Traverse(type, depth);
+                }
+        }
 	void TraverseDetail(const clang::ParmVarDecl *decl, int depth){
 		// デフォルト引数
 		if(decl->hasDefaultArg()){ Traverse(decl->getDefaultArg(), depth); }
+		if(decl->getTypeSourceInfo()){
+			constantArrayHack(*decl->getTypeSourceInfo(), depth);
+		}
 	}
 
 	//------------------------------------------------------------------------
@@ -196,6 +226,8 @@ private:
 		TestAndTraverse<clang::DeclStmt>(stmt, depth);
 		TestAndTraverse<clang::DeclRefExpr>(stmt, depth);
 		TestAndTraverse<clang::MemberExpr>(stmt, depth);
+		TestAndTraverse<clang::InitListExpr>(stmt, depth);
+		TestAndTraverse<clang::DesignatedInitExpr>(stmt, depth);
 		TestAndTraverse<clang::CallExpr>(stmt, depth);
 		TestAndTraverse<clang::CXXConstructExpr>(stmt, depth);
 		TestAndTraverse<clang::ExplicitCastExpr>(stmt, depth);
@@ -225,6 +257,18 @@ private:
 			Traverse(expr->getTemplateArgs()[i], depth);
 		}
 	}
+        void TraverseDetail(const clang::InitListExpr *expr, int depth){
+            if(const auto syntactic = expr->getSyntacticForm()) {
+                    Traverse(syntactic, depth);
+            }
+        }
+        void TraverseDetail(const clang::DesignatedInitExpr *expr, int depth){
+                for(const auto child : expr->designators()){
+                        if(const auto field = child.getField()) {
+                                Traverse(field, depth + 1);
+                        }
+                }
+        }
 	void TraverseDetail(const clang::CallExpr *expr, int depth){
 		// 呼び出される関数
 		Traverse(expr->getCallee(), depth);
@@ -246,6 +290,28 @@ private:
 	}
 
 	//------------------------------------------------------------------------
+	// TypeLocs
+	//------------------------------------------------------------------------
+        template<typename T>
+        void TestAndTraverse(const clang::TypeLoc typeloc, int depth){
+               const auto typeloc2 = typeloc.getAsAdjusted<T>();
+               if (!typeloc2.isNull()) TraverseDetail(typeloc2, depth);
+        }
+
+	void Traverse(const clang::TypeLoc typeloc, int depth){
+#ifdef DEBUG_DUMP_AST
+		std::cerr << std::string(depth * 2, ' ')
+		          << "TL: " << typeloc.getType()->getTypeClassName() << std::endl;
+#endif
+                TestAndTraverse<clang::ConstantArrayTypeLoc>(typeloc, depth+1);
+	}
+
+        void TraverseDetail(const clang::ConstantArrayTypeLoc typeloc, int depth){
+                Traverse(typeloc.getInnerType(), depth);
+                Traverse(typeloc.getSizeExpr(), depth);
+        }
+
+	//------------------------------------------------------------------------
 	// Types
 	//------------------------------------------------------------------------
 	void Traverse(const clang::QualType &type, int depth){
@@ -260,11 +326,16 @@ private:
 #endif
 		TestAndTraverse<clang::PointerType>(type, depth);
 		TestAndTraverse<clang::ReferenceType>(type, depth);
+		TestAndTraverse<clang::ConstantArrayType>(type, depth);
 		TestAndTraverse<clang::ArrayType>(type, depth);
 		TestAndTraverse<clang::AttributedType>(type, depth);
+		TestAndTraverse<clang::TypeOfType>(type, depth);
+		TestAndTraverse<clang::FunctionProtoType>(type, depth);
+		TestAndTraverse<clang::ParenType>(type, depth);
 		TestAndTraverse<clang::AutoType>(type, depth);
 		TestAndTraverse<clang::DecltypeType>(type, depth);
 		TestAndTraverse<clang::RecordType>(type, depth);
+		TestAndTraverse<clang::EnumType>(type, depth);
 		TestAndTraverse<clang::TypedefType>(type, depth);
 		TestAndTraverse<clang::TemplateSpecializationType>(type, depth);
 		TestAndTraverse<clang::ElaboratedType>(type, depth);
@@ -282,9 +353,23 @@ private:
 		// 要素の型
 		Traverse(type->getElementType(), depth);
 	}
+	void TraverseDetail(const clang::ConstantArrayType *type, int depth){
+		// 要素の型
+		Traverse(type->getElementType(), depth);
+	}
 	void TraverseDetail(const clang::AttributedType *type, int depth){
 		// 修飾された型
 		Traverse(type->getModifiedType(), depth);
+	}
+	void TraverseDetail(const clang::TypeOfType *type, int depth){
+		Traverse(type->getUnderlyingType(), depth);
+	}
+	void TraverseDetail(const clang::FunctionProtoType *type, int depth){
+		for(const auto paramType : type->param_types()){ Traverse(paramType, depth); }
+		Traverse(type->getReturnType(), depth);
+	}
+	void TraverseDetail(const clang::ParenType *type, int depth){
+		Traverse(type->getInnerType(), depth);
 	}
 	void TraverseDetail(const clang::AutoType *type, int depth){
 		// 型推論の結果
@@ -297,6 +382,10 @@ private:
 		Traverse(type->getUnderlyingType(), depth);
 	}
 	void TraverseDetail(const clang::RecordType *type, int depth){
+		// 構造体の定義
+		Traverse(type->getDecl(), depth);
+	}
+	void TraverseDetail(const clang::EnumType *type, int depth){
 		// 構造体の定義
 		Traverse(type->getDecl(), depth);
 	}
@@ -441,6 +530,10 @@ private:
 			const auto record_decl =
 				clang::dyn_cast<clang::RecordDecl>(decl_ctx);
 			return record_decl->getBraceRange().getEnd();
+		}else if(clang::isa<clang::EnumDecl>(decl_ctx)){
+			const auto enum_decl =
+				clang::dyn_cast<clang::EnumDecl>(decl_ctx);
+			return enum_decl->getBraceRange().getEnd();
 		}else{
 			const auto main_file_id = m_source_manager->getMainFileID();
 			return m_source_manager->getLocForEndOfFile(main_file_id);
@@ -474,6 +567,20 @@ private:
 				clang::dyn_cast<clang::CXXRecordDecl>(decl);
 			if(record_decl->getDescribedClassTemplate()){
 				return DeclEnd(record_decl->getDescribedClassTemplate());
+			}
+		}
+		if(clang::isa<clang::RecordDecl>(decl)){
+			const auto record_decl =
+				clang::dyn_cast<clang::RecordDecl>(decl);
+			if(record_decl->getDescribedTemplate()){
+				return DeclEnd(record_decl->getDescribedTemplate());
+			}
+		}
+		if(clang::isa<clang::EnumDecl>(decl)){
+			const auto enum_decl =
+				clang::dyn_cast<clang::EnumDecl>(decl);
+			if(enum_decl->getDescribedTemplate()){
+				return DeclEnd(enum_decl->getDescribedTemplate());
 			}
 		}
 		if(clang::isa<clang::CXXMethodDecl>(decl)){
@@ -525,10 +632,13 @@ private:
 		return loc;
 	}
 
-	bool MarkRecursive(const clang::Decl *decl, int depth){
+	bool MarkRecursiveFiltered(const clang::Decl *decl, int depth){
 		if(m_traversed_decls.find(decl) == m_traversed_decls.end()){
 			return false;
 		}
+                return MarkRecursive(decl, depth);
+        }
+	bool MarkRecursive(const clang::Decl *decl, int depth){
 #ifdef DEBUG_DUMP_AST
 		std::cerr << std::string(depth * 2, ' ')
 		          << "M: " << decl->getDeclKindName();
@@ -559,10 +669,12 @@ private:
 		result |= TestAndMark<clang::TypeAliasDecl>(decl, depth);
 		result |= TestAndMark<clang::TypeAliasTemplateDecl>(decl, depth);
 		result |= TestAndMark<clang::RecordDecl>(decl, depth);
+		result |= TestAndMark<clang::EnumDecl>(decl, depth);
 		result |= TestAndMark<clang::ClassTemplateDecl>(decl, depth);
 		result |= TestAndMark<clang::ClassTemplateSpecializationDecl>(decl, depth);
 
 		result |= TestAndMark<clang::FieldDecl>(decl, depth);
+		result |= TestAndMark<clang::EnumConstantDecl>(decl, depth);
 		result |= TestAndMark<clang::FunctionDecl>(decl, depth);
 		result |= TestAndMark<clang::FunctionTemplateDecl>(decl, depth);
 		result |= TestAndMark<clang::VarDecl>(decl, depth);
@@ -604,6 +716,12 @@ private:
 	bool MarkDetail(const clang::RecordDecl *decl, int depth){
 		MarkRange(clang::SourceRange(decl->getOuterLocStart(), EndOfHead(decl)));
 		MarkRange(decl->getBraceRange().getEnd(), DeclEnd(decl));
+		for(const auto child : decl->decls()){ MarkRecursiveFiltered(child, depth); }
+		return true;
+	}
+	bool MarkDetail(const clang::EnumDecl *decl, int depth){
+		MarkRange(clang::SourceRange(decl->getOuterLocStart(), EndOfHead(decl)));
+		MarkRange(decl->getBraceRange().getEnd(), DeclEnd(decl));
 		for(const auto child : decl->decls()){ MarkRecursive(child, depth); }
 		return true;
 	}
@@ -629,6 +747,10 @@ private:
 	}
 
 	bool MarkDetail(const clang::FieldDecl *decl, int depth){
+		MarkRange(decl->getBeginLoc(), DeclEnd(decl));
+		return true;
+	}
+	bool MarkDetail(const clang::EnumConstantDecl *decl, int depth){
 		MarkRange(decl->getBeginLoc(), DeclEnd(decl));
 		return true;
 	}
@@ -670,13 +792,13 @@ public:
 		m_source_manager = &sm;
 		reset();
 		for(const auto decl : tu->decls()){
-			if(clang::isa<clang::VarDecl>(decl)){
-				Traverse(decl, 0);
-			}else if(clang::isa<clang::NamespaceDecl>(decl)){
-				Traverse(decl, 0);
-			}else if(clang::isa<clang::UsingDirectiveDecl>(decl)){
-				Traverse(decl, 0);
-			}else if(clang::isa<clang::FunctionDecl>(decl)){
+			// if(clang::isa<clang::VarDecl>(decl)){
+			// 	Traverse(decl, 0);
+			// }else if(clang::isa<clang::NamespaceDecl>(decl)){
+			// 	Traverse(decl, 0);
+			// }else if(clang::isa<clang::UsingDirectiveDecl>(decl)){
+			// 	Traverse(decl, 0);
+			/*}else*/ if(clang::isa<clang::FunctionDecl>(decl)){
 				const auto func_decl =
 					clang::dyn_cast<clang::FunctionDecl>(decl);
 				if(func_decl->isMain()){
@@ -684,10 +806,23 @@ public:
 				}
 			}
 		}
+
 		for(const auto decl : tu->decls()){
-			MarkRecursive(decl, 0);
+                    if (m_traversed_decls.find(decl) != m_traversed_decls.end()
+                        || isAFwdDeclWhoseDefIsTraversed(decl))
+                            MarkRecursive(decl, 0);
 		}
 	}
+        bool isAFwdDeclWhoseDefIsTraversed(const clang::Decl *decl){
+                if(const auto tagDecl = clang::dyn_cast<clang::TagDecl>(decl)){
+                        if (const auto maybeDef = tagDecl->getDefinition()){
+                                if (m_traversed_decls.find(maybeDef) != m_traversed_decls.end()){
+                                        return true;
+                                }
+                        }
+                }
+                return false;
+        }
 
 };
 
