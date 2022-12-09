@@ -2,12 +2,12 @@
 #define CPP_SIMPLIFIER_SIMPLIFIER_HPP
 
 #include <string>
-#include <vector>
+#include <unordered_set>
 
 std::string simplify(
+	clang::tooling::ClangTool &tool,
 	const std::string &input_source,
-	const std::string &input_filename,
-	const std::vector<std::string> &clang_options);
+	const std::unordered_set<std::string> &roots);
 
 #endif
 

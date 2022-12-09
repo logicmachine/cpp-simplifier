@@ -25,7 +25,7 @@ def run_tokenized_simplify(minifier_path, input_path):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
+    if len(sys.argv) < 3:
         print('Usage: python %s minifier_path [test_directory]' % sys.argv[0])
         quit()
     minifier_path = sys.argv[1]

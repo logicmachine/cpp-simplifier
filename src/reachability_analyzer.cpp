@@ -1,11 +1,11 @@
+#include <sstream>
 #include <iostream>
 #include <unordered_set>
 #include <clang/AST/ExprCXX.h>
 #include <clang/AST/DeclCXX.h>
 #include <clang/AST/DeclTemplate.h>
+#include "debug.hpp"
 #include "reachability_analyzer.hpp"
-
-// #define DEBUG_DUMP_AST
 
 class ReachabilityAnalyzer::ASTConsumer : public clang::ASTConsumer {
 
@@ -16,6 +16,7 @@ private:
 	std::unordered_set<const clang::Type *> m_traversed_types;
 
 	std::shared_ptr<ReachabilityMarker> m_marker;
+        const std::unordered_set<std::string>& m_roots;
 
 	void reset(){
 		m_traversed_decls.clear();
@@ -35,15 +36,9 @@ private:
 		return loc.getLocWithOffset(-col);
 	}
 
-	//------------------------------------------------------------------------
-	// Declarations
-	//------------------------------------------------------------------------
-	void Traverse(const clang::Decl *decl, int depth){
-		if(!decl){ return; }
-		if(!m_traversed_decls.insert(decl).second){ return; }
-#ifdef DEBUG_DUMP_AST
+	void debug(int depth, char type, const clang::Decl* decl){
 		std::cerr << std::string(depth * 2, ' ')
-		          << "D: " << decl->getDeclKindName();
+		          << type << ": " << decl->getDeclKindName();
 		if(clang::isa<clang::NamedDecl>(decl)){
 			const auto named_decl = clang::dyn_cast<clang::NamedDecl>(decl);
 			const auto name = named_decl->getNameAsString();
@@ -51,16 +46,23 @@ private:
 		}else{
 			std::cerr << std::endl;
 		}
-		{
-			const auto range = decl->getSourceRange();
-			std::cerr << std::string(depth * 2 + 4, ' ') << "- "
-			          << range.getBegin().printToString(*m_source_manager)
-			          << std::endl;
-			std::cerr << std::string(depth * 2 + 4, ' ') << "- "
-			          << range.getEnd().printToString(*m_source_manager)
-			          << std::endl;
-		}
-#endif
+		const auto range = decl->getSourceRange();
+		std::cerr << std::string(depth * 2 + 4, ' ') << "- "
+			  << range.getBegin().printToString(*m_source_manager)
+			  << std::endl;
+		std::cerr << std::string(depth * 2 + 4, ' ') << "- "
+			  << range.getEnd().printToString(*m_source_manager)
+			  << std::endl;
+	}
+	//------------------------------------------------------------------------
+	// Declarations
+	//------------------------------------------------------------------------
+	void Traverse(const clang::Decl *decl, int depth){
+		if(!decl){ return; }
+		if(!m_traversed_decls.insert(decl).second){ return; }
+
+		SIMP_DEBUG(debug(depth, 'D', decl));
+
 		{	// 親の定義
 			const auto ctx = decl->getDeclContext();
 			if(ctx && clang::isa<clang::Decl>(ctx)){
@@ -210,16 +212,20 @@ private:
 		}
 	}
 
+        void debug(int depth, const std::string type, const std::string& info){
+            std::cerr << std::string(depth * 2, ' ')
+                << type << ": " << info << std::endl;
+        }
+
 	//------------------------------------------------------------------------
 	// Statements
 	//------------------------------------------------------------------------
 	void Traverse(const clang::Stmt *stmt, int depth){
 		if(!stmt){ return; }
 		if(!m_traversed_stmts.insert(stmt).second){ return; }
-#ifdef DEBUG_DUMP_AST
-		std::cerr << std::string(depth * 2, ' ')
-		          << "S: " << stmt->getStmtClassName() << std::endl;
-#endif
+
+		SIMP_DEBUG(debug(depth, "S", stmt->getStmtClassName()));
+
 		for(const auto child : stmt->children()){
 			Traverse(child, depth + 1);
 		}
@@ -299,10 +305,9 @@ private:
         }
 
 	void Traverse(const clang::TypeLoc typeloc, int depth){
-#ifdef DEBUG_DUMP_AST
-		std::cerr << std::string(depth * 2, ' ')
-		          << "TL: " << typeloc.getType()->getTypeClassName() << std::endl;
-#endif
+
+		SIMP_DEBUG(debug(depth, "TL", typeloc.getType()->getTypeClassName()));
+
                 TestAndTraverse<clang::ConstantArrayTypeLoc>(typeloc, depth+1);
 	}
 
@@ -320,10 +325,9 @@ private:
 	void Traverse(const clang::Type *type, int depth){
 		if(!type){ return; }
 		if(!m_traversed_types.insert(type).second){ return; }
-#ifdef DEBUG_DUMP_AST
-		std::cerr << std::string(depth * 2, ' ')
-		          << "T: " << type->getTypeClassName() << std::endl;
-#endif
+
+		SIMP_DEBUG(debug(depth, "T", type->getTypeClassName()));
+
 		TestAndTraverse<clang::PointerType>(type, depth);
 		TestAndTraverse<clang::ReferenceType>(type, depth);
 		TestAndTraverse<clang::ConstantArrayType>(type, depth);
@@ -479,14 +483,10 @@ private:
 		const auto main_file_id = m_source_manager->getMainFileID();
 		const auto begin = range.getBegin();
 		const auto end = range.getEnd();
-#ifdef DEBUG_DUMP_AST
-		std::cerr << "Mark: "
-		          << range.getBegin().printToString(*m_source_manager)
-		          << std::endl;
-		std::cerr << "      "
-		          << range.getEnd().printToString(*m_source_manager)
-		          << std::endl;
-#endif
+
+		SIMP_DEBUG(debug(0, "Mark", range.getBegin().printToString(*m_source_manager)));
+		SIMP_DEBUG(debug(0, "    ", range.getEnd().printToString(*m_source_manager)));
+
 		if(m_source_manager->getFileID(begin) != main_file_id){ return; }
 		const auto begin_line =
 			m_source_manager->getPresumedLineNumber(begin) - 1;
@@ -639,26 +639,9 @@ private:
                 return MarkRecursive(decl, depth);
         }
 	bool MarkRecursive(const clang::Decl *decl, int depth){
-#ifdef DEBUG_DUMP_AST
-		std::cerr << std::string(depth * 2, ' ')
-		          << "M: " << decl->getDeclKindName();
-		if(clang::isa<clang::NamedDecl>(decl)){
-			const auto named_decl = clang::dyn_cast<clang::NamedDecl>(decl);
-			const auto name = named_decl->getNameAsString();
-			std::cerr << " (" << name << ")" << std::endl;
-		}else{
-			std::cerr << std::endl;
-		}
-		{
-			const auto range = decl->getSourceRange();
-			std::cerr << std::string(depth * 2 + 4, ' ') << "- "
-			          << range.getBegin().printToString(*m_source_manager)
-			          << std::endl;
-			std::cerr << std::string(depth * 2 + 4, ' ') << "- "
-			          << range.getEnd().printToString(*m_source_manager)
-			          << std::endl;
-		}
-#endif
+
+		SIMP_DEBUG(debug(depth, 'M', decl));
+
 		if(decl->isImplicit()){ return false; }
 		bool result = false;
 		result |= TestAndMark<clang::AccessSpecDecl>(decl, depth);
@@ -778,76 +761,104 @@ private:
 	}
 
 public:
-	ASTConsumer(std::shared_ptr<ReachabilityMarker> marker)
+	ASTConsumer(std::shared_ptr<ReachabilityMarker> marker, const std::unordered_set<std::string>& roots)
 		: clang::ASTConsumer()
 		, m_marker(std::move(marker))
+		, m_roots(roots)
 	{ }
+
+	std::unordered_set<const clang::FunctionDecl*> getFuncRoots(const clang::TranslationUnitDecl* tu, const clang::IdentifierTable& idents){
+		std::unordered_set<const clang::FunctionDecl*> result;
+		for(const auto root : m_roots){
+			bool inserted = false;
+			const auto maybeFound = idents.find(root);
+			if (maybeFound != idents.end()) {
+				const auto lookupResult = tu->lookup(clang::DeclarationName(maybeFound->getValue()));
+				for (const auto named_decl : lookupResult){
+					if(const auto func_decl = named_decl->getAsFunction()){
+						result.insert(func_decl);
+						inserted = true;
+					}
+				}
+			}
+			if (!inserted){
+				// TODO earlier checking, not throwing runtime_error
+				std::ostringstream oss;
+				oss << "Error: root '" <<  root << "' not found." << std::endl;
+				throw std::runtime_error(oss.str());
+			}
+		}
+		return result;
+	}
 
 	virtual void HandleTranslationUnit(clang::ASTContext &context) override {
 		const auto &sm = context.getSourceManager();
 		const auto tu = context.getTranslationUnitDecl();
-#ifdef DEBUG_DUMP_AST
-		tu->dump();
-#endif
+
+		SIMP_DEBUG(tu->dump());
 		m_source_manager = &sm;
 		reset();
-		for(const auto decl : tu->decls()){
-			// if(clang::isa<clang::VarDecl>(decl)){
-			// 	Traverse(decl, 0);
-			// }else if(clang::isa<clang::NamespaceDecl>(decl)){
-			// 	Traverse(decl, 0);
-			// }else if(clang::isa<clang::UsingDirectiveDecl>(decl)){
-			// 	Traverse(decl, 0);
-			/*}else*/ if(clang::isa<clang::FunctionDecl>(decl)){
-				const auto func_decl =
-					clang::dyn_cast<clang::FunctionDecl>(decl);
-				if(func_decl->isMain()){
-					Traverse(decl, 0);
+
+		if (!m_roots.empty()){
+			const auto funcRoots = getFuncRoots(tu, context.Idents);
+			for (const auto decl : funcRoots) Traverse(decl, 0);
+		}else{
+			for(const auto decl : tu->decls()){
+				if(const auto func_decl = clang::dyn_cast<clang::FunctionDecl>(decl)){
+					if(func_decl->isMain()){
+						Traverse(decl, 0);
+					}
 				}
 			}
 		}
 
 		for(const auto decl : tu->decls()){
-                    if (m_traversed_decls.find(decl) != m_traversed_decls.end()
-                        || isAFwdDeclWhoseDefIsTraversed(decl))
-                            MarkRecursive(decl, 0);
+			if (m_traversed_decls.find(decl) != m_traversed_decls.end()
+				|| isAFwdDeclWhoseDefIsTraversed(decl))
+				MarkRecursive(decl, 0);
 		}
 	}
-        bool isAFwdDeclWhoseDefIsTraversed(const clang::Decl *decl){
-                if(const auto tagDecl = clang::dyn_cast<clang::TagDecl>(decl)){
-                        if (const auto maybeDef = tagDecl->getDefinition()){
-                                if (m_traversed_decls.find(maybeDef) != m_traversed_decls.end()){
-                                        return true;
-                                }
-                        }
-                }
-                return false;
-        }
+
+	// TODO This can't be the best/correct way...
+	bool isAFwdDeclWhoseDefIsTraversed(const clang::Decl *decl){
+		if(const auto tagDecl = clang::dyn_cast<clang::TagDecl>(decl)){
+			if (const auto maybeDef = tagDecl->getDefinition()){
+				if (m_traversed_decls.find(maybeDef) != m_traversed_decls.end()){
+					return true;
+				}
+			}
+		}
+		return false;
+	}
 
 };
 
 
 ReachabilityAnalyzer::ReachabilityAnalyzer(
-	std::shared_ptr<ReachabilityMarker> marker)
+	std::shared_ptr<ReachabilityMarker> marker,
+	const std::unordered_set<std::string>& roots)
 	: clang::ASTFrontendAction()
 	, m_marker(std::move(marker))
+	, m_roots(roots)
 { }
 
 std::unique_ptr<clang::ASTConsumer> ReachabilityAnalyzer::CreateASTConsumer(
 	clang::CompilerInstance &ci,
 	llvm::StringRef in_file)
 {
-	return std::make_unique<ASTConsumer>(m_marker);
+	return std::make_unique<ASTConsumer>(m_marker, m_roots);
 }
 
 
 ReachabilityAnalyzerFactory::ReachabilityAnalyzerFactory(
-	std::shared_ptr<ReachabilityMarker> marker)
+	std::shared_ptr<ReachabilityMarker> marker,
+	const std::unordered_set<std::string>& roots)
 	: clang::tooling::FrontendActionFactory()
 	, m_marker(std::move(marker))
+	, m_roots(roots)
 { }
 
 std::unique_ptr<clang::FrontendAction> ReachabilityAnalyzerFactory::create(){
-	return std::make_unique<ReachabilityAnalyzer>(m_marker);
+	return std::make_unique<ReachabilityAnalyzer>(m_marker, m_roots);
 }
 

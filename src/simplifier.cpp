@@ -7,20 +7,15 @@
 #include "simplifier.hpp"
 #include "reachability_analyzer.hpp"
 
-std::string simplify(
-	const std::string &input_source,
-	const std::string &input_filename,
-	const std::vector<std::string> &clang_options)
-{
-	namespace tooling = clang::tooling;
-	tooling::FixedCompilationDatabase compilations(".", clang_options);
-	tooling::ClangTool tool(
-		compilations, llvm::ArrayRef<std::string>(input_filename));
-	tool.mapVirtualFile(input_filename, input_source);
+namespace tl = clang::tooling;
 
-	tool.appendArgumentsAdjuster(tooling::getClangSyntaxOnlyAdjuster());
+std::string simplify(
+	tl::ClangTool &tool,
+	const std::string &input_source,
+	const std::unordered_set<std::string> &roots)
+{
 	auto marker = std::make_shared<ReachabilityMarker>();
-	ReachabilityAnalyzerFactory analyzer_factory(marker);
+	ReachabilityAnalyzerFactory analyzer_factory(marker, roots);
 	if(tool.run(&analyzer_factory) != 0){
 		throw std::runtime_error("compilation error");
 	}
