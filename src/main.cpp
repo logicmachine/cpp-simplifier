@@ -89,7 +89,7 @@ std::string read_from_stream(std::istream &is){
 namespace cl = llvm::cl;
 namespace tl = clang::tooling;
 
-cl::OptionCategory simplifier_category("cpp-simplifier options");
+cl::OptionCategory simplifier_category("c-simplifier options");
 cl::extrahelp common_help(tl::CommonOptionsParser::HelpMessage);
 cl::opt<std::string> output_filename("o",
 	cl::desc("Specify output filename"),

@@ -85,13 +85,66 @@ pKVM, without having to support irrelevant C constructs.
 - LLVM/clang 10.0
 - CMake 3.0
 
-### How to build
+### Build
+
 ```
 mkdir build && pushd -q build
 cmake -DCMAKE_BUILD_TYPE=Debug ../src
 popd -q && make -C build
 ```
 
+You can type `make -C help` for more info too.
+
+## Usage
+
+See `/path/to/c-simplifier --help` for full list of options.
+
+Suppose you have a `compile_commands.json` file like the one below (some build
+systems natively support the generation of such a file, for projects which do
+not use such a build sytem, [Bear](https://github.com/rizsotto/Bear/) generates
+the JSON file during the build process).
+
+```json
+[
+    {
+        directory: "/repo/root",
+        command: "/prebuilts/linux-x86/clang-r433403b/bin/clang -Wp,-MMD,arch/arm64/kvm/hyp/nvhe/../.pgtable.nvhe.o.d  -nostdinc -isystem /home/dhruv/linux-x86/clang-r433403b/lib64/clang/13.0.3/include -I./arch/arm64/include -I./arch/arm64/include/generated  -I./include -I./arch/arm64/include/uapi -I./arch/arm64/include/generated/uapi -I./include/uapi -I./include/generated/uapi -include ./include/linux/kconfig.h -include ./include/linux/compiler_types.h -D__KERNEL__ -mlittle-endian -DKASAN_SHADOW_SCALE_SHIFT= -Qunused-arguments -fmacro-prefix-map=./= -Wall -Wundef -Werror=strict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common -fshort-wchar -fno-PIE -Werror=implicit-function-declaration -Werror=implicit-int -Werror=return-type -Wno-format-security -std=gnu89 --target=aarch64-linux-gnu -integrated-as -Werror=unknown-warning-option -mgeneral-regs-only -DCONFIG_CC_HAS_K_CONSTRAINT=1 -Wno-psabi -fno-asynchronous-unwind-tables -fno-unwind-tables -mbranch-protection=pac-ret+leaf+bti -Wa,-march=armv8.5-a -DARM64_ASM_ARCH='\"armv8.5-a\"' -DKASAN_SHADOW_SCALE_SHIFT= -fno-delete-null-pointer-checks -Wno-frame-address -Wno-address-of-packed-member -O2 -Wframe-larger-than=2048 -fstack-protector-strong -Wno-format-invalid-specifier -Wno-gnu -mno-global-merge -Wno-unused-but-set-variable -Wno-unused-const-variable -fno-omit-frame-pointer -fno-optimize-sibling-calls -g -Wdeclaration-after-statement -Wvla -Wno-pointer-sign -Wno-array-bounds -fno-strict-overflow -fno-stack-check -Werror=date-time -Werror=incompatible-pointer-types -Wno-initializer-overrides -Wno-format -Wno-sign-compare -Wno-format-zero-length -Wno-pointer-to-enum-cast -Wno-tautological-constant-out-of-range-compare -mstack-protector-guard=sysreg -mstack-protector-guard-reg=sp_el0 -mstack-protector-guard-offset=1272 -I./arch/arm64/kvm/hyp/include -fno-stack-protector -DDISABLE_BRANCH_PROFILING -D__KVM_NVHE_HYPERVISOR__ -D__DISABLE_EXPORTS -D__DISABLE_TRACE_MMIO__    -DKBUILD_MODFILE='\"arch/arm64/kvm/hyp/nvhe/pgtable.nvhe\"' -DKBUILD_BASENAME='\"pgtable.nvhe\"' -DKBUILD_MODNAME='\"pgtable.nvhe\"' -D__KBUILD_MODNAME=kmod_pgtable.nvhe -c -o arch/arm64/kvm/hyp/nvhe/../pgtable.nvhe.o -x cpp-output preprocessed.c",
+        file: "preprocessed.c"
+    },
+    {
+        directory: "/repo/root",
+        command: "/prebuilts/linux-x86/clang-r433403b/bin/clang -Wp,-MMD,arch/arm64/kvm/hyp/nvhe/../.pgtable.nvhe.o.d  -nostdinc -isystem /home/dhruv/linux-x86/clang-r433403b/lib64/clang/13.0.3/include -I./arch/arm64/include -I./arch/arm64/include/generated  -I./include -I./arch/arm64/include/uapi -I./arch/arm64/include/generated/uapi -I./include/uapi -I./include/generated/uapi -include ./include/linux/kconfig.h -include ./include/linux/compiler_types.h -D__KERNEL__ -mlittle-endian -DKASAN_SHADOW_SCALE_SHIFT= -Qunused-arguments -fmacro-prefix-map=./= -Wall -Wundef -Werror=strict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common -fshort-wchar -fno-PIE -Werror=implicit-function-declaration -Werror=implicit-int -Werror=return-type -Wno-format-security -std=gnu89 --target=aarch64-linux-gnu -integrated-as -Werror=unknown-warning-option -mgeneral-regs-only -DCONFIG_CC_HAS_K_CONSTRAINT=1 -Wno-psabi -fno-asynchronous-unwind-tables -fno-unwind-tables -mbranch-protection=pac-ret+leaf+bti -Wa,-march=armv8.5-a -DARM64_ASM_ARCH='\"armv8.5-a\"' -DKASAN_SHADOW_SCALE_SHIFT= -fno-delete-null-pointer-checks -Wno-frame-address -Wno-address-of-packed-member -O2 -Wframe-larger-than=2048 -fstack-protector-strong -Wno-format-invalid-specifier -Wno-gnu -mno-global-merge -Wno-unused-but-set-variable -Wno-unused-const-variable -fno-omit-frame-pointer -fno-optimize-sibling-calls -g -Wdeclaration-after-statement -Wvla -Wno-pointer-sign -Wno-array-bounds -fno-strict-overflow -fno-stack-check -Werror=date-time -Werror=incompatible-pointer-types -Wno-initializer-overrides -Wno-format -Wno-sign-compare -Wno-format-zero-length -Wno-pointer-to-enum-cast -Wno-tautological-constant-out-of-range-compare -mstack-protector-guard=sysreg -mstack-protector-guard-reg=sp_el0 -mstack-protector-guard-offset=1272 -I./arch/arm64/kvm/hyp/include -fno-stack-protector -DDISABLE_BRANCH_PROFILING -D__KVM_NVHE_HYPERVISOR__ -D__DISABLE_EXPORTS -D__DISABLE_TRACE_MMIO__    -DKBUILD_MODFILE='\"arch/arm64/kvm/hyp/nvhe/pgtable.nvhe\"' -DKBUILD_BASENAME='\"pgtable.nvhe\"' -DKBUILD_MODNAME='\"pgtable.nvhe\"' -D__KBUILD_MODNAME=kmod_pgtable.nvhe -c -o arch/arm64/kvm/hyp/nvhe/../pgtable.nvhe.o arch/arm64/kvm/hyp/nvhe/../pgtable.c",
+        file: "arch/arm64/kvm/hyp/nvhe/../pgtable.c"
+    }
+]
+```
+
+Then simply below commands run in `/repo/root`
+
+```sh
+/path/to/c-simplifier/build/c-simplifier -d -r kvm_pgtable_walk -o preprocessed.cutdown.c preprocessed.c  --extra-arg=-Wno-unused-value --extra-arg=-Wno-misleading-indentation 2> preprocessed.cutdown.log
+```
+
+```sh
+/path/to/c-simplifier/build/c-simplifier -d -r kvm_pgtable_walk -o pgtable.cutdown.c arch/arm64/kvm/hyp/nvhe/../pgtable.c  --extra-arg=-Wno-unused-value --extra-arg=-Wno-misleading-indentation 2> pgtable.cutdown.log
+```
+
+In the `/tmp` directory you will then find:
+
+```sh
+# find /tmp/arch /tmp/include -type f
+/tmp/include/asm-generic/int-ll64.h
+/tmp/include/linux/types.h
+/tmp/include/linux/stddef.h
+/tmp/include/uapi/asm-generic/int-ll64.h
+/tmp/arch/arm64/include/asm/kvm_pgtable.h
+/tmp/arch/arm64/include/asm/kvm_host.h
+/tmp/arch/arm64/include/asm/cpufeature.h
+/tmp/arch/arm64/include/asm/kvm_asm.h
+/tmp/arch/arm64/kvm/hyp/include/nvhe/memory.h
+/tmp/arch/arm64/kvm/hyp/pgtable.c
+/tmp/arch/arm64/kvm/hyp/inline_funcptr.h
+```
 
 ## To Do
 
