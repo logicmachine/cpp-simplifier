@@ -1,0 +1,12 @@
+# C++
+| ".*\\.hpp"        -> frame open:"/*" line:"*" close:"*/"
+| ".*\\.cpp"        -> frame open:"/*" line:"*" close:"*/"
+# Python
+| ".*\\.py"         -> frame  open:"#" line:"#"  close:"#"
+# Misc
+| "CMakeLists.txt"  -> frame open:"#"  line:"#" close:"#"
+| ".*\\.cmake"      -> frame open:"#"  line:"#" close:"#"
+| ".*\\.yml"        -> frame open:"#"  line:"#" close:"#"
+| ".*\\.gitignore"  -> frame open:"#"  line:"#" close:"#"
+| ".*\\.gitmodules" -> frame open:"#"  line:"#" close:"#"
+| ".*\\.md"         -> frame open:"<!--"  line:" " close:"- -> "
