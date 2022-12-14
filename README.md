@@ -99,10 +99,9 @@ You can type `make -C help` for more info too.
 
 See `/path/to/c-simplifier --help` for full list of options.
 
-Suppose you have a `compile_commands.json` file like the one below (some build
-systems natively support the generation of such a file, for projects which do
-not use such a build sytem, [Bear](https://github.com/rizsotto/Bear/) generates
-the JSON file during the build process).
+Suppose you have a `compile_commands.json` file like the one below in some `/repo/root`.
+(Note: for projects which do not use build systems that natively support the generation
+of such a file, use [Bear](https://github.com/rizsotto/Bear/).)
 
 ```json
 [
@@ -119,7 +118,7 @@ the JSON file during the build process).
 ]
 ```
 
-Then simply below commands run in `/repo/root`
+Then simply run the below commands in `/repo/root`
 
 ```sh
 /path/to/c-simplifier/build/c-simplifier -d -r kvm_pgtable_walk -o preprocessed.cutdown.c preprocessed.c  --extra-arg=-Wno-unused-value --extra-arg=-Wno-misleading-indentation 2> preprocessed.cutdown.log
@@ -151,8 +150,8 @@ In the `/tmp` directory you will then find:
 - [x] C constructs required for `kvm_pgtable_walk` in `pgtable.c`
 - [x] Command line interface and support for `compile_commands.json`
 - [x] Support for reproducing directory structure
+- [ ] Mark `#include` and `#define` (especially multiline ones!)
 - [ ] Preprocess file within tool to retain all comments (including licence headers)
-- [ ] Mark licence comments, `#include` and `#define` (especially multiline ones!)
 - [ ] Example for README.md
 - [ ] Fix up tests (and add new ones)
 - [ ] Update .travis.yml
