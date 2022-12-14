@@ -76,7 +76,7 @@ int main(int argc, const char *argv[]){
 		filename = "(stdin).cpp";
 		source = read_from_stream(std::cin);
 	}else{
-		std::ifstream ifs(filename.c_str());
+		std::ifstream ifs(filename);
 		source = read_from_stream(ifs);
 	}
 
@@ -89,7 +89,7 @@ int main(int argc, const char *argv[]){
 	// 	input_source, input_filename, clang_options);
 
 	const std::unordered_set<std::string> rootSet(roots.begin(), roots.end());
-	const auto result = simplify(tool, source, rootSet);
+	const auto result = simplify(tool, filename, rootSet);
 
 	if(!output_filename.empty()){
 		std::ofstream ofs(output_filename.c_str());

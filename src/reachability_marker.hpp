@@ -1,34 +1,46 @@
 #ifndef CPP_SIMPLIFIER_REACHABILITY_MARKER_HPP
 #define CPP_SIMPLIFIER_REACHABILITY_MARKER_HPP
 
+#include <string>
+#include <unordered_map>
 #include <vector>
 
 class ReachabilityMarker {
 
 private:
-	std::vector<bool> m_marker;
+	std::unordered_map<std::string, std::vector<bool>> m_map;
 
 public:
-	ReachabilityMarker()
-		: m_marker()
-	{ }
+	ReachabilityMarker() = default;
 
-	void mark(unsigned int line){
-		while(m_marker.size() <= line){
-			m_marker.push_back(false);
+	void mark(const std::string file, unsigned int line){
+		auto& marker = m_map[file];
+		while(marker.size() <= line){
+			marker.push_back(false);
 		}
-		m_marker[line] = true;
+		marker[line] = true;
 	}
 
-	void unmark(unsigned int line){
-		if((*this)(line)){
-			m_marker[line] = false;
+	void unmark(const std::string file, unsigned int line){
+		if((*this)(file, line)){
+			auto& marker = m_map.at(file);
+			marker[line] = false;
 		}
 	}
 
-	bool operator()(unsigned int line) const {
-		if(line >= m_marker.size()){ return false; }
-		return m_marker[line];
+	bool operator()(const std::string file, unsigned int line) const {
+		if (m_map.find(file) == m_map.end()){ return false; }
+		const auto& marker = m_map.at(file);
+		if(line >= marker.size()){ return false; }
+		return marker[line];
+	}
+
+	auto begin() const noexcept {
+		return m_map.begin();
+	}
+
+	auto end() const noexcept {
+		return m_map.end();
 	}
 
 };

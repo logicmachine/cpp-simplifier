@@ -6,7 +6,7 @@
 
 std::string simplify(
 	clang::tooling::ClangTool &tool,
-	const std::string &input_source,
+	const std::string &input_filname,
 	const std::unordered_set<std::string> &roots);
 
 #endif

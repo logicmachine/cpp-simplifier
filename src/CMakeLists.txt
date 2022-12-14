@@ -13,13 +13,8 @@ link_directories(${LLVM_LINK_DIR})
 find_package(Threads REQUIRED)
 
 include(CheckCXXCompilerFlag)
-CHECK_CXX_COMPILER_FLAG("-std=c++14" COMPILER_SUPPORTS_CXX14)
-CHECK_CXX_COMPILER_FLAG("-std=c++1y" COMPILER_SUPPORTS_CXX1Y)
-if(COMPILER_SUPPORTS_CXX14)
-	add_definitions("-std=c++14")
-elseif(COMPILER_SUPPORTS_CXX1Y)
-	add_definitions("-std=c++1y")
-endif()
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 file(GLOB CXX_SOURCES "*.cpp")
 

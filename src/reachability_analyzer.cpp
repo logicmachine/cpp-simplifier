@@ -480,20 +480,21 @@ private:
 	}
 
 	void MarkRange(const clang::SourceRange &range){
-		const auto main_file_id = m_source_manager->getMainFileID();
+		//const auto main_file_id = m_source_manager->getMainFileID();
 		const auto begin = range.getBegin();
 		const auto end = range.getEnd();
 
 		SIMP_DEBUG(debug(0, "Mark", range.getBegin().printToString(*m_source_manager)));
 		SIMP_DEBUG(debug(0, "    ", range.getEnd().printToString(*m_source_manager)));
 
-		if(m_source_manager->getFileID(begin) != main_file_id){ return; }
-		const auto begin_line =
-			m_source_manager->getPresumedLineNumber(begin) - 1;
-		const auto end_line =
-			m_source_manager->getPresumedLineNumber(end) - 1;
+		//if(m_source_manager->getFileID(begin) != main_file_id){ return; }
+		const auto begin_line = m_source_manager->getPresumedLineNumber(begin) - 1;
+		const auto end_line = m_source_manager->getPresumedLineNumber(end) - 1;
+                const auto presumed = m_source_manager->getPresumedLoc(begin);
+                if (presumed.isInvalid()) return;
+                const auto filename = std::string(presumed.getFilename());
 		for(unsigned int i = begin_line; i <= end_line; ++i){
-			m_marker->mark(i);
+			m_marker->mark(filename, i);
 		}
 	}
 
