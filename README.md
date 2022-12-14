@@ -117,5 +117,5 @@ ELVER).
 
 ## History
 
-The initial implementation of the Language Server source and end-to-end tests
-was taken from [cpp-simplifier](https://github.com/logicmachine/cpp-simplifier/).
+The initial implementation and tests
+were taken from [cpp-simplifier](https://github.com/logicmachine/cpp-simplifier/).
