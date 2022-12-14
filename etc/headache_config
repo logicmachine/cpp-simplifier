@@ -9,4 +9,4 @@
 | ".*\\.yml"        -> frame open:"#"  line:"#" close:"#"
 | ".*\\.gitignore"  -> frame open:"#"  line:"#" close:"#"
 | ".*\\.gitmodules" -> frame open:"#"  line:"#" close:"#"
-| ".*\\.md"         -> frame open:"<!--"  line:" " close:"- -> "
+| ".*\\.md"         -> frame open:"<!--"  line:" " close:"-->"
