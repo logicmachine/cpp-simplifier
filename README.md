@@ -131,18 +131,19 @@ Then simply run the below commands in `/repo/root`
 In the `/tmp` directory you will then find:
 
 ```sh
-# find /tmp/arch /tmp/include -type f
-/tmp/include/asm-generic/int-ll64.h
-/tmp/include/linux/types.h
-/tmp/include/linux/stddef.h
-/tmp/include/uapi/asm-generic/int-ll64.h
-/tmp/arch/arm64/include/asm/kvm_pgtable.h
-/tmp/arch/arm64/include/asm/kvm_host.h
-/tmp/arch/arm64/include/asm/cpufeature.h
-/tmp/arch/arm64/include/asm/kvm_asm.h
-/tmp/arch/arm64/kvm/hyp/include/nvhe/memory.h
-/tmp/arch/arm64/kvm/hyp/pgtable.c
-/tmp/arch/arm64/kvm/hyp/inline_funcptr.h
+# grep "Tmp dir:" *.cutdown.log ==> /tmp/c-simplifier-55b854
+# find /tmp/c-simplifier-55b854 -type f
+/tmp/c-simplifier-55b854/arch/arm64/include/asm/kvm_pgtable.h
+/tmp/c-simplifier-55b854/arch/arm64/include/asm/kvm_host.h
+/tmp/c-simplifier-55b854/arch/arm64/include/asm/cpufeature.h
+/tmp/c-simplifier-55b854/arch/arm64/include/asm/kvm_asm.h
+/tmp/c-simplifier-55b854/arch/arm64/kvm/hyp/include/nvhe/memory.h
+/tmp/c-simplifier-55b854/arch/arm64/kvm/hyp/pgtable.c
+/tmp/c-simplifier-55b854/arch/arm64/kvm/hyp/inline_funcptr.h
+/tmp/c-simplifier-55b854/include/asm-generic/int-ll64.h
+/tmp/c-simplifier-55b854/include/linux/types.h
+/tmp/c-simplifier-55b854/include/linux/stddef.h
+/tmp/c-simplifier-55b854/include/uapi/asm-generic/int-ll64.h
 ```
 
 ## To Do
