@@ -72,6 +72,8 @@
 #include <memory>
 #include <filesystem>
 #include <iostream>
+#include <iomanip>
+#include <random>
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Tooling/Tooling.h>
 #include <clang/Tooling/CompilationDatabase.h>
@@ -82,10 +84,20 @@
 namespace tl = clang::tooling;
 namespace fs = std::filesystem;
 
-std::ofstream create(const fs::path& filepath){
-	const auto newpath = fs::temp_directory_path() / filepath;
+std::ofstream create(const fs::path tmp_hex, const fs::path& filepath){
+	const auto newpath = tmp_hex / filepath;
 	fs::create_directories(fs::path(newpath).remove_filename());
 	return std::ofstream(newpath);
+}
+
+fs::path tmp_hex(){
+	std::random_device rd;
+	std::uniform_int_distribution<int> dist(0, 16777216);
+	const auto hex = dist(rd);
+	std::ostringstream oss;
+	oss << "c-simplifier-" << std::setw(6) << std::hex << dist(rd);
+	const auto result = fs::temp_directory_path() / fs::path(oss.str());
+	return fs::exists(result) ? tmp_hex() : result;
 }
 
 std::string simplify(
@@ -100,12 +112,13 @@ std::string simplify(
 	}
 
 	std::ostringstream oss;
+	const auto tmp_dir = tmp_hex();
+	std::cerr << "Tmp dir: " << tmp_dir << std::endl;
 	for (const auto& it : *marker){
 		const auto& filename = it.first;
 		const auto also_oss = input_filename.find(filename) != std::string::npos;
 		std::cerr << "Outputting: " << filename << std::endl;
-		const fs::path filepath(filename);
-		auto ofs = create(filepath);
+		auto ofs = create(tmp_dir, fs::path(filename));
 		const auto& marked = it.second;
 		std::ifstream iss(filename);
 		for(unsigned int i = 0; i < marked.size() && !iss.eof(); ++i){
