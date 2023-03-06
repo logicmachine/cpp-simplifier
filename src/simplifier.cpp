@@ -131,7 +131,7 @@ std::string simplify(
 			if(std::getline(iss, line)){
 				unsigned int j = 0;
 				while(j < line.size() && isspace(line[j])){ ++j; }
-				if(line[j] == '#' || marked[i]){
+				if(/*line[j] == '#' || */ marked[i]){
 					ofs << line << std::endl;
 					if (also_oss) oss << line << std::endl;
 				}

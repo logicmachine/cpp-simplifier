@@ -76,14 +76,80 @@
 #include <clang/Frontend/FrontendActions.h>
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Tooling/Tooling.h>
+#include "debug.hpp"
 #include "reachability_marker.hpp"
+
+struct SourceRangeHash {
+	size_t operator()(const clang::SourceRange &range) const
+	{
+		size_t result = std::hash<unsigned>()(range.getBegin().getRawEncoding());
+		result <<= sizeof(unsigned) * 8;
+		result |= std::hash<unsigned>()(range.getEnd().getRawEncoding());
+		return result;
+	}
+};
+
+using SourceRangeSet = std::unordered_set<clang::SourceRange, SourceRangeHash>;
+
+class PPRecordNested : public clang::PPCallbacks {
+public:
+	using Map = std::unordered_map<clang::SourceRange, SourceRangeSet, SourceRangeHash>;
+private:
+	Map& m_macro_deps;
+	clang::SourceManager &m_sm;
+public:
+        clang::SourceRange defn_range(const clang::MacroDefinition& MD) {
+		auto macro_info= MD.getMacroInfo();
+		assert (macro_info);
+		return clang::SourceRange(macro_info->getDefinitionLoc(), macro_info->getDefinitionEndLoc());
+	}
+
+	virtual void MacroExpands(
+		const clang::Token &Id
+		, const clang::MacroDefinition &MD
+		, clang::SourceRange Range
+		, const clang::MacroArgs *Args) override
+	{
+		static bool assigned = false;
+		static clang::SourceRange outer_macro_defn_range;
+		if (!Id.getLocation().isMacroID()) {
+			outer_macro_defn_range = defn_range(MD);
+			assigned = true;
+			SIMP_DEBUG(std::cerr << "TL Macro: " << Id.getIdentifierInfo()->getNameStart() << std::endl);
+		} else {
+			assert (assigned);
+			int count = 0;
+			for (auto loc = Id.getLocation(); loc.isMacroID(); loc = m_sm.getImmediateMacroCallerLoc(loc), count++)
+			{}
+			SIMP_DEBUG(std::cerr << std::string(count * 2, ' ') << Id.getIdentifierInfo()->getNameStart() << std::endl);
+			m_macro_deps[outer_macro_defn_range].emplace(defn_range(MD));
+		}
+	}
+	PPRecordNested(Map& macro_deps
+		, clang::SourceManager& sm)
+		: clang::PPCallbacks()
+		, m_macro_deps(macro_deps)
+		, m_sm(sm)
+	{}
+	virtual ~PPRecordNested() { }
+};
 
 class ReachabilityAnalyzer : public clang::ASTFrontendAction {
 
 private:
 	std::shared_ptr<ReachabilityMarker> m_marker;
+	SourceRangeSet m_ranges;
 	const std::unordered_set<std::string>& m_roots;
 
+protected:
+	void ExecuteAction() override;
+
+	void findMacroDefns(
+		clang::PreprocessingRecord& pr,
+		clang::SourceManager& sm,
+		clang::SourceRange range,
+		const PPRecordNested::Map& macro_deps,
+		SourceRangeSet& marked);
 public:
 	class ASTConsumer;
 
@@ -94,7 +160,6 @@ public:
 	virtual std::unique_ptr<clang::ASTConsumer> CreateASTConsumer(
 		clang::CompilerInstance &ci,
 		llvm::StringRef in_file) override;
-        
         
 };
 

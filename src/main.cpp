@@ -116,6 +116,8 @@ static tl::CommandLineArguments remove_clang13_only_flags(
 	        return !std::regex_match(s, clang13_only_flags);
 	});
 	result.push_back("-fparse-all-comments");
+	result.push_back("-Xclang");
+	result.push_back("-detailed-preprocessing-record");
 	return result;
 }
 
@@ -135,8 +137,8 @@ int main(int argc, const char *argv[]){
 	tool.appendArgumentsAdjuster(remove_clang13_only_flags);
 
 	// TODO delete this (not needed, messing up locations)
-	// const auto unrolled = unroll_inclusion(
-	// 	input_source, input_filename, clang_options);
+	// TODO OR track all pp directive/macro sources
+	// unroll_inclusion(tool, filename);
 
 	const std::unordered_set<std::string> rootSet(roots.begin(), roots.end());
 	const auto result = simplify(tool, filename, rootSet);

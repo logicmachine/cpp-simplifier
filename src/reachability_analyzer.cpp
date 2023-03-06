@@ -73,16 +73,15 @@
 #include <clang/AST/ExprCXX.h>
 #include <clang/AST/DeclCXX.h>
 #include <clang/AST/DeclTemplate.h>
-#include "debug.hpp"
 #include "reachability_analyzer.hpp"
 
 std::string RangeToString(clang::SourceRange range, const clang::SourceManager& sm){
 	const auto begin = sm.getPresumedLoc(range.getBegin());
 	const auto end = sm.getPresumedLoc(range.getEnd());
 	if (!begin.isValid() || !end.isValid()) { return std::string("invalid"); }
-        const auto diff_files = std::string(begin.getFilename()) != std::string(end.getFilename());
+	const auto diff_files = std::string(begin.getFilename()) != std::string(end.getFilename());
 	std::ostringstream result;
-        if (!diff_files)
+	if (!diff_files)
 		result << begin.getFilename() << ", " << begin.getLine() << ':' << begin.getColumn() << " - "
 			<< end.getLine() << ':' << end.getColumn();
 	else
@@ -135,6 +134,7 @@ private:
 	std::unordered_set<const clang::Type *> m_traversed_types;
 
 	std::shared_ptr<ReachabilityMarker> m_marker;
+	SourceRangeSet& m_ranges;
 	const std::unordered_set<std::string>& m_roots;
 
 	void reset(){
@@ -583,6 +583,7 @@ private:
 
 	void MarkRange(const clang::SourceRange &range){
 		MarkRangeSM(range, *m_source_manager, m_marker);
+		m_ranges.insert(range);
 	}
 
 	void MarkRange(
@@ -627,55 +628,42 @@ private:
 			return decl;
 		};
 		auto next = next_explicit_decl(decl);
-		if(next){ return PreviousLine(next->getBeginLoc()); }
-		const auto main_file_id = m_source_manager->getMainFileID();
-		const auto eof = m_source_manager->getLocForEndOfFile(main_file_id);
-		if(clang::isa<clang::ClassTemplateSpecializationDecl>(decl)){
-			const auto cts_decl =
-				clang::dyn_cast<clang::ClassTemplateSpecializationDecl>(decl);
+		if(next){
+			return PreviousLine(next->getBeginLoc());
+		}
+		if(const auto cts_decl = clang::dyn_cast<clang::ClassTemplateSpecializationDecl>(decl)){
 			if(cts_decl->isExplicitSpecialization()){
 				return DeclEnd(clang::dyn_cast<clang::Decl>(cts_decl->getParent()));
 			}else{
 				return DeclEnd(cts_decl->getSpecializedTemplate());
 			}
 		}
-		if(clang::isa<clang::CXXRecordDecl>(decl)){
-			const auto record_decl =
-				clang::dyn_cast<clang::CXXRecordDecl>(decl);
-			if(record_decl->getDescribedClassTemplate()){
-				return DeclEnd(record_decl->getDescribedClassTemplate());
+		if(const auto record_decl = clang::dyn_cast<clang::CXXRecordDecl>(decl)){
+			if (const auto templ = record_decl->getDescribedClassTemplate())
+				return DeclEnd(templ);
+		}
+		if(const auto record_decl = clang::dyn_cast<clang::RecordDecl>(decl)){
+			if (const auto templ = record_decl->getDescribedTemplate()) {
+				return DeclEnd(templ);
 			}
 		}
-		if(clang::isa<clang::RecordDecl>(decl)){
-			const auto record_decl =
-				clang::dyn_cast<clang::RecordDecl>(decl);
-			if(record_decl->getDescribedTemplate()){
-				return DeclEnd(record_decl->getDescribedTemplate());
+		if(const auto enum_decl = clang::dyn_cast<clang::EnumDecl>(decl)){
+			if (const auto templ = enum_decl->getDescribedTemplate()){
+				return DeclEnd(templ);
 			}
 		}
-		if(clang::isa<clang::EnumDecl>(decl)){
-			const auto enum_decl =
-				clang::dyn_cast<clang::EnumDecl>(decl);
-			if(enum_decl->getDescribedTemplate()){
-				return DeclEnd(enum_decl->getDescribedTemplate());
+		if(const auto method_decl = clang::dyn_cast<clang::CXXMethodDecl>(decl)){
+			if(const auto func_templ = method_decl->getDescribedFunctionTemplate()){
+				return DeclEnd(func_templ);
+			}else if(const auto prim_templ = method_decl->getPrimaryTemplate()){
+				return DeclEnd(prim_templ);
 			}
 		}
-		if(clang::isa<clang::CXXMethodDecl>(decl)){
-			const auto method_decl =
-				clang::dyn_cast<clang::CXXMethodDecl>(decl);
-			if(method_decl->getDescribedFunctionTemplate()){
-				return DeclEnd(method_decl->getDescribedFunctionTemplate());
-			}else if(method_decl->getPrimaryTemplate()){
-				return DeclEnd(method_decl->getPrimaryTemplate());
-			}
-		}
-		if(clang::isa<clang::FunctionDecl>(decl)){
-			const auto func_decl =
-				clang::dyn_cast<clang::FunctionDecl>(decl);
-			if(func_decl->getDescribedFunctionTemplate()){
-				return DeclEnd(func_decl->getDescribedFunctionTemplate());
-			}else if(func_decl->getPrimaryTemplate()){
-				return DeclEnd(func_decl->getPrimaryTemplate());
+		if(const auto func_decl = clang::dyn_cast<clang::FunctionDecl>(decl)){
+			if(const auto func_templ = func_decl->getDescribedFunctionTemplate()){
+				return DeclEnd(func_templ);
+			}else if(const auto prim_templ = func_decl->getPrimaryTemplate()){
+				return DeclEnd(prim_templ);
 			}
 		}
 		const auto rbrace = FindRBrace(decl->getDeclContext());
@@ -839,10 +827,14 @@ private:
 	}
 
 public:
-	ASTConsumer(std::shared_ptr<ReachabilityMarker> marker, const std::unordered_set<std::string>& roots)
+
+	ASTConsumer(std::shared_ptr<ReachabilityMarker> marker
+		, const std::unordered_set<std::string>& roots
+		, SourceRangeSet& ranges)
 		: clang::ASTConsumer()
 		, m_marker(std::move(marker))
 		, m_roots(roots)
+		, m_ranges(ranges)
 	{ }
 
 	std::unordered_set<const clang::FunctionDecl*> getFuncRoots(const clang::TranslationUnitDecl* tu, const clang::IdentifierTable& idents){
@@ -918,13 +910,77 @@ ReachabilityAnalyzer::ReachabilityAnalyzer(
 	: clang::ASTFrontendAction()
 	, m_marker(std::move(marker))
 	, m_roots(roots)
+	, m_ranges()
 { }
 
 std::unique_ptr<clang::ASTConsumer> ReachabilityAnalyzer::CreateASTConsumer(
 	clang::CompilerInstance &ci,
 	llvm::StringRef in_file)
 {
-	return std::make_unique<ASTConsumer>(m_marker, m_roots);
+	return std::make_unique<ASTConsumer>(m_marker, m_roots, m_ranges);
+}
+
+void ReachabilityAnalyzer::findMacroDefns(clang::PreprocessingRecord& pr, clang::SourceManager& sm, clang::SourceRange range,
+	const PPRecordNested::Map& macro_deps, SourceRangeSet& marked){
+	std::cerr << "Macro expansions in " << RangeToString(range, sm) << std::endl;
+	const auto depth = "    ";
+	const auto inRange = pr.getPreprocessedEntitiesInRange(range);
+	for (const auto* entity : inRange) {
+		if (!entity) { std::cerr << "sad entity :(" << std::endl; continue; }
+		if(const auto macro_exp = clang::dyn_cast<clang::MacroExpansion>(entity)){
+			const auto *id_info = macro_exp->getName();
+			const auto defn_range = macro_exp->getDefinition()->getSourceRange();
+			std::cerr << "  " << id_info->getNameStart() << std::endl;
+			std::cerr << depth << "Expanded at " << RangeToString(macro_exp->getSourceRange(), sm) << std::endl;
+                        std::cerr << depth << "Defined " << RangeToString(defn_range, sm) << std::endl;
+			{
+				const auto presumed = sm.getPresumedLoc(defn_range.getBegin());
+                                assert(presumed.isValid());
+				const auto filename = std::string(presumed.getFilename());
+				if (filename == "<built-in>" || filename == "<command line>") {
+					std::cerr << depth << "not from a file" << std::endl;
+				        continue;
+				}
+			}
+			MarkRangeSM(defn_range, sm, m_marker);
+			marked.emplace(defn_range);
+			const auto dep_ranges = macro_deps.find(defn_range);
+			if (dep_ranges == macro_deps.end()){ /* macro with no dependencies */ continue; }
+			for (const auto& dep_range : dep_ranges->second){
+				std::cerr << depth << "Uses " << RangeToString(dep_range, sm) << std::endl;
+				if (marked.find(dep_range) == marked.end()) { continue; }
+				MarkRangeSM(dep_range, sm, m_marker);
+				marked.emplace(dep_range);
+			}
+		}
+	}
+}
+
+// 1. The PreprocessingRecord only inlcudes the Macro expanded when typed into the source,
+//    not any subsequent macros expanded _inside a macro_.
+// 2. None of SourceManager::{getFileLoc,getExpansionLoc,get(Immediate)SpellingLoc}() enable 
+//    to go from the source _down_/expand the Macros, only to go from a fully expanded location
+//    back up to the source.
+// 3. It seems difficult/not sensible to re-lex/pp the macro _definition_ to get at the macros
+//    it refers to.
+// Therefore, we need to add a PPCallback that records _all_ macro expansions, even that occur
+// within a macro.
+// We should however, be able to use emitIncludeStack to get the transitive source of a macro.
+void ReachabilityAnalyzer::ExecuteAction()
+{
+	auto &ci = getCompilerInstance();
+	auto &pp = ci.getPreprocessor();
+	PPRecordNested::Map macro_deps;
+	auto &sm = ci.getSourceManager();
+	pp.addPPCallbacks(std::make_unique<PPRecordNested>(macro_deps, sm));
+
+	ASTFrontendAction::ExecuteAction();
+	auto *pr = pp.getPreprocessingRecord();
+	if (!pr) {
+		std::cerr << "No preprocessing record found :(" << std::endl;
+	}
+	SourceRangeSet marked;
+	for (const auto& range : m_ranges) findMacroDefns(*pr, sm, range, macro_deps, marked);
 }
 
 
