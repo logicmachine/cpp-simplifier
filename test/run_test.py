@@ -67,7 +67,7 @@
 #  SOFTWARE.                                                                       #
 ####################################################################################
 
-import os, sys, re, subprocess;
+import os, sys, re, subprocess, json;
 import clang.cindex
 
 def print_success(name):
@@ -76,22 +76,15 @@ def print_success(name):
 def print_failed(name):
     print('\033[31m[ FAILED ]\033[m %s' % name)
 
-def tokenize(input_path):
-    index = clang.cindex.Index.create()
-    tu = index.parse(input_path, args=['-std=c++11'])
-    tokens = tu.get_tokens(extent=tu.cursor.extent)
-    return '\n'.join([t.spelling for t in tokens]) + '\n'
-
 def run_simplify(minifier_path, input_path):
+    cwd = os.getcwd()
+    rel_input = os.path.relpath(input_path, cwd)
+    with open('compile_commands.json', 'w') as compile_cmds:
+        json.dump([{ "directory": cwd, "command": "clang -c " + rel_input, "file" : rel_input }], compile_cmds)
     proc = subprocess.Popen([minifier_path, input_path], stdout=subprocess.PIPE)
-    return proc.communicate()[0].decode('utf-8')
-
-def run_tokenized_simplify(minifier_path, input_path):
-    source = tokenize(input_path)
-    proc = subprocess.Popen(
-        [minifier_path, '-'], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-    return proc.communicate(source.encode('utf-8'))[0].decode('utf-8')
-
+    result = proc.communicate()[0].decode('utf-8')
+    os.remove('compile_commands.json')
+    return result
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:
@@ -119,7 +112,6 @@ if __name__ == '__main__':
         test_name = filepath[len(test_directory):]
         input_path = filepath + '.in.cpp'
         expect_path = filepath + '.out.cpp'
-        # normal
         expect = ''.join([s.decode('utf-8') for s in open(expect_path, 'rb').readlines()])
         actual = run_simplify(minifier_path, input_path)
         if expect == actual:
@@ -128,20 +120,6 @@ if __name__ == '__main__':
         else:
             print_failed(test_name)
             failed_tests.append(test_name)
-        # tokenized
-        test_name += ' (tokenized)'
-        expect = tokenize(expect_path)
-        actual = run_tokenized_simplify(minifier_path, input_path)
-        if expect == actual:
-            print_success(test_name)
-            passed_tests.append(test_name)
-        else:
-            print_failed(test_name)
-            failed_tests.append(test_name)
-            print('---- expect ----')
-            print(expect)
-            print('---- actual ----')
-            print(actual)
     if len(failed_tests) == 0:
         print_success('%d tests.' % len(passed_tests))
     else:

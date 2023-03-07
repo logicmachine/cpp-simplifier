@@ -79,13 +79,6 @@
 #include "inclusion_unroller.hpp"
 #include "simplifier.hpp"
 
-std::string read_from_stream(std::istream &is){
-	std::ostringstream oss;
-	std::string line;
-	while(std::getline(is, line)){ oss << line << std::endl; }
-	return oss.str();
-}
-
 namespace cl = llvm::cl;
 namespace tl = clang::tooling;
 
@@ -138,19 +131,7 @@ int main(int argc, const char *argv[]){
 	}
 
 	std::string filename = filenames[0];
-	std::string source;
-
-	// Mostly to keep test infrastructure working
-	if(filename == "-"){
-		filename = "(stdin).cpp";
-		source = read_from_stream(std::cin);
-	}else{
-		std::ifstream ifs(filename);
-		source = read_from_stream(ifs);
-	}
-
 	tl::ClangTool tool(options_parser.getCompilations(), llvm::ArrayRef<std::string>(filename));
-	tool.mapVirtualFile(filename, source);
 	tool.appendArgumentsAdjuster(remove_clang13_only_flags);
 
 	// TODO delete this (not needed, messing up locations)

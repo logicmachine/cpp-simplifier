@@ -167,10 +167,13 @@ private:
 
 		SIMP_DEBUG(debug(depth, 'D', decl));
 
-		{	// 親の定義
-			const auto ctx = decl->getDeclContext();
-			if(ctx && clang::isa<clang::Decl>(ctx)){
-				Traverse(clang::dyn_cast<clang::Decl>(ctx), depth + 1);
+		// the declaration might be in a context
+		if (const auto ctx = decl->getDeclContext()){
+			for (const auto& udir : ctx->using_directives()) {
+				Traverse(udir, depth+1);
+			}
+			if (const auto ctx_decl = clang::dyn_cast<clang::Decl>(ctx)){
+				Traverse(ctx_decl, depth + 1);
 			}
 		}
 
@@ -717,6 +720,7 @@ private:
 		SIMP_DEBUG(debug(depth, 'M', decl));
 
 		if(decl->isImplicit()){ return false; }
+
 		bool result = false;
 		result |= TestAndMark<clang::AccessSpecDecl>(decl, depth);
 		result |= TestAndMark<clang::UsingDirectiveDecl>(decl, depth);
@@ -749,7 +753,7 @@ private:
 	bool MarkDetail(const clang::NamespaceDecl *decl, int depth){
 		bool result = false;
 		for(const auto child : decl->decls()){
-			result |= MarkRecursive(child, depth);
+			result |= MarkRecursiveFiltered(child, depth);
 		}
 		if(result){
 			MarkRange(clang::SourceRange(decl->getBeginLoc(), EndOfHead(decl)));

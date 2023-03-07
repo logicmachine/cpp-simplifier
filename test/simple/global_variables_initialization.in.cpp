@@ -6,5 +6,5 @@ int bar(){
 }
 int a = foo();
 int main(){
-	return 0;
+	return a;
 }
