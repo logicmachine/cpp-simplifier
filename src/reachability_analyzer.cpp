@@ -76,10 +76,60 @@
 #include "debug.hpp"
 #include "reachability_analyzer.hpp"
 
+std::string RangeToString(clang::SourceRange range, const clang::SourceManager& sm){
+	const auto begin = sm.getPresumedLoc(range.getBegin());
+	const auto end = sm.getPresumedLoc(range.getEnd());
+	if (!begin.isValid() || !end.isValid()) { return std::string("invalid"); }
+        const auto diff_files = std::string(begin.getFilename()) != std::string(end.getFilename());
+	std::ostringstream result;
+        if (!diff_files)
+		result << begin.getFilename() << ", " << begin.getLine() << ':' << begin.getColumn() << " - "
+			<< end.getLine() << ':' << end.getColumn();
+	else
+		result << begin.getFilename() << ':' << begin.getLine() << ':' << begin.getColumn() << " - "
+			<< end.getFilename() << ':' << end.getLine() << ':' << end.getColumn();
+	return result.str();
+}
+
+void debugSM(int depth, char type, const clang::Decl* decl, const clang::SourceManager& sm){
+	std::cerr << std::string(depth * 2, ' ')
+	          << type << ": " << decl->getDeclKindName();
+	if(clang::isa<clang::NamedDecl>(decl)){
+		const auto named_decl = clang::dyn_cast<clang::NamedDecl>(decl);
+		const auto name = named_decl->getNameAsString();
+		std::cerr << " (" << name << ") at ";
+	}
+
+	std::cerr << RangeToString(decl->getSourceRange(), sm) << std::endl;
+}
+void debugStr(int depth, const std::string type, const std::string& info){
+	std::cerr << std::string(depth * 2, ' ') << type << ": " << info << std::endl;
+}
+void MarkRangeSM(const clang::SourceRange& range, const clang::SourceManager& sm,
+	const std::shared_ptr<ReachabilityMarker> marker){
+	//const auto main_file_id = m_source_manager->getMainFileID();
+	const auto begin = range.getBegin();
+	const auto end = range.getEnd();
+
+	//if(m_source_manager->getFileID(begin) != main_file_id){ return; }
+	const auto begin_line = sm.getPresumedLineNumber(begin) - 1;
+	const auto end_line = sm.getPresumedLineNumber(end) - 1;
+	const auto presumed = sm.getPresumedLoc(begin);
+        if (presumed.isInvalid()) { return; }
+
+	SIMP_DEBUG(debugStr(1, "Mark " + RangeToString(range, sm), " "));
+
+	const auto filename = std::string(presumed.getFilename());
+	for(unsigned int i = begin_line; i <= end_line; ++i){
+		marker->mark(filename, i);
+	}
+}
+
+
 class ReachabilityAnalyzer::ASTConsumer : public clang::ASTConsumer {
 
 private:
-	const clang::SourceManager *m_source_manager;
+	const clang::SourceManager* m_source_manager;
 	std::unordered_set<const clang::Decl *> m_traversed_decls;
 	std::unordered_set<const clang::Stmt *> m_traversed_stmts;
 	std::unordered_set<const clang::Type *> m_traversed_types;
@@ -106,22 +156,7 @@ private:
 	}
 
 	void debug(int depth, char type, const clang::Decl* decl){
-		std::cerr << std::string(depth * 2, ' ')
-		          << type << ": " << decl->getDeclKindName();
-		if(clang::isa<clang::NamedDecl>(decl)){
-			const auto named_decl = clang::dyn_cast<clang::NamedDecl>(decl);
-			const auto name = named_decl->getNameAsString();
-			std::cerr << " (" << name << ")" << std::endl;
-		}else{
-			std::cerr << std::endl;
-		}
-		const auto range = decl->getSourceRange();
-		std::cerr << std::string(depth * 2 + 4, ' ') << "- "
-			  << range.getBegin().printToString(*m_source_manager)
-			  << std::endl;
-		std::cerr << std::string(depth * 2 + 4, ' ') << "- "
-			  << range.getEnd().printToString(*m_source_manager)
-			  << std::endl;
+		debugSM(depth, type, decl, *m_source_manager);
 	}
 	//------------------------------------------------------------------------
 	// Declarations
@@ -150,12 +185,12 @@ private:
 			TestAndTraverse<clang::ClassTemplateDecl>(decl, depth);
 		TestAndTraverse<clang::TemplateDecl>(decl, depth);
 
-                        TestAndTraverse<clang::ParmVarDecl>(decl, depth);
-                    TestAndTraverse<clang::VarDecl>(decl, depth);
-                    TestAndTraverse<clang::FieldDecl>(decl, depth);
-                    TestAndTraverse<clang::EnumConstantDecl >(decl, depth);
-                        TestAndTraverse<clang::CXXConstructorDecl>(decl, depth);
-                    TestAndTraverse<clang::FunctionDecl>(decl, depth);
+				TestAndTraverse<clang::ParmVarDecl>(decl, depth);
+				TestAndTraverse<clang::VarDecl>(decl, depth);
+			TestAndTraverse<clang::FieldDecl>(decl, depth);
+			TestAndTraverse<clang::EnumConstantDecl >(decl, depth);
+				TestAndTraverse<clang::CXXConstructorDecl>(decl, depth);
+			TestAndTraverse<clang::FunctionDecl>(decl, depth);
 		TestAndTraverse<clang::ValueDecl>(decl, depth);
 	}
 
@@ -283,10 +318,6 @@ private:
 		}
 	}
 
-	void debug(int depth, const std::string type, const std::string& info){
-		std::cerr << std::string(depth * 2, ' ') << type << ": " << info << std::endl;
-	}
-
 	//------------------------------------------------------------------------
 	// Statements
 	//------------------------------------------------------------------------
@@ -294,7 +325,7 @@ private:
 		if(!stmt){ return; }
 		if(!m_traversed_stmts.insert(stmt).second){ return; }
 
-		SIMP_DEBUG(debug(depth, "S", stmt->getStmtClassName()));
+		SIMP_DEBUG(debugStr(depth, "S", stmt->getStmtClassName()));
 
 		for(const auto child : stmt->children()){
 			Traverse(child, depth + 1);
@@ -375,7 +406,7 @@ private:
 	}
 
 	void Traverse(const clang::TypeLoc typeloc, int depth){
-		SIMP_DEBUG(debug(depth, "TL", typeloc.getType()->getTypeClassName()));
+		SIMP_DEBUG(debugStr(depth, "TL", typeloc.getType()->getTypeClassName()));
 		TestAndTraverse<clang::ConstantArrayTypeLoc>(typeloc, depth+1);
 	}
 
@@ -394,7 +425,7 @@ private:
 		if(!type){ return; }
 		if(!m_traversed_types.insert(type).second){ return; }
 
-		SIMP_DEBUG(debug(depth, "T", type->getTypeClassName()));
+		SIMP_DEBUG(debugStr(depth, "T", type->getTypeClassName()));
 
 		TestAndTraverse<clang::PointerType>(type, depth);
 		TestAndTraverse<clang::ReferenceType>(type, depth);
@@ -548,22 +579,7 @@ private:
 	}
 
 	void MarkRange(const clang::SourceRange &range){
-		//const auto main_file_id = m_source_manager->getMainFileID();
-		const auto begin = range.getBegin();
-		const auto end = range.getEnd();
-
-		SIMP_DEBUG(debug(0, "Mark", range.getBegin().printToString(*m_source_manager)));
-		SIMP_DEBUG(debug(0, "    ", range.getEnd().printToString(*m_source_manager)));
-
-		//if(m_source_manager->getFileID(begin) != main_file_id){ return; }
-		const auto begin_line = m_source_manager->getPresumedLineNumber(begin) - 1;
-		const auto end_line = m_source_manager->getPresumedLineNumber(end) - 1;
-		const auto presumed = m_source_manager->getPresumedLoc(begin);
-		if (presumed.isInvalid()) return;
-		const auto filename = std::string(presumed.getFilename());
-		for(unsigned int i = begin_line; i <= end_line; ++i){
-			m_marker->mark(filename, i);
-		}
+		MarkRangeSM(range, *m_source_manager, m_marker);
 	}
 
 	void MarkRange(
@@ -574,34 +590,23 @@ private:
 	}
 
 	clang::SourceLocation FindRBrace(const clang::DeclContext *decl_ctx){
-		if(clang::isa<clang::NamespaceDecl>(decl_ctx)){
-			const auto namespace_decl =
-				clang::dyn_cast<clang::NamespaceDecl>(decl_ctx);
+		if(const auto namespace_decl = clang::dyn_cast<clang::NamespaceDecl>(decl_ctx)){
 			return namespace_decl->getRBraceLoc();
-		}else if(clang::isa<clang::ClassTemplateSpecializationDecl>(decl_ctx)){
-			const auto cts_decl =
-				clang::dyn_cast<clang::ClassTemplateSpecializationDecl>(decl_ctx);
+		}else if(const auto cts_decl = clang::dyn_cast<clang::ClassTemplateSpecializationDecl>(decl_ctx)){
 			const auto from = cts_decl->getInstantiatedFrom();
 			if(from.is<clang::ClassTemplatePartialSpecializationDecl *>()){
-				const auto ctps_decl =
-					from.get<clang::ClassTemplatePartialSpecializationDecl *>();
-				if(ctps_decl){
+				if(const auto ctps_decl = from.get<clang::ClassTemplatePartialSpecializationDecl *>()){
 					return ctps_decl->getBraceRange().getEnd();
 				}
 			}else{
-				const auto ct_decl = from.get<clang::ClassTemplateDecl *>();
-				if(ct_decl){
+				if(const auto ct_decl = from.get<clang::ClassTemplateDecl *>()){
 					const auto templated_decl = ct_decl->getTemplatedDecl();
 					return templated_decl->getBraceRange().getEnd();
 				}
 			}
-		}else if(clang::isa<clang::RecordDecl>(decl_ctx)){
-			const auto record_decl =
-				clang::dyn_cast<clang::RecordDecl>(decl_ctx);
+		}else if(const auto record_decl = clang::dyn_cast<clang::RecordDecl>(decl_ctx)){
 			return record_decl->getBraceRange().getEnd();
-		}else if(clang::isa<clang::EnumDecl>(decl_ctx)){
-			const auto enum_decl =
-				clang::dyn_cast<clang::EnumDecl>(decl_ctx);
+		}else if(const auto enum_decl = clang::dyn_cast<clang::EnumDecl>(decl_ctx)){
 			return enum_decl->getBraceRange().getEnd();
 		}else{
 			const auto main_file_id = m_source_manager->getMainFileID();

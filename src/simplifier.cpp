@@ -84,20 +84,25 @@
 namespace tl = clang::tooling;
 namespace fs = std::filesystem;
 
-std::ofstream create(const fs::path tmp_hex, const fs::path& filepath){
-	const auto newpath = tmp_hex / filepath;
+std::ofstream create(const fs::path tmp_dir, const fs::path& filepath){
+        if (filepath.is_absolute()) {
+            std::cerr << "Please fix compile_commands.json to use relative path for " << filepath << std::endl;
+            std::exit(1);
+        }
+	// operator/ returns the RHS if it is an absolute path, which overwrites the user's file!
+	const auto newpath = tmp_dir / filepath;
 	fs::create_directories(fs::path(newpath).remove_filename());
 	return std::ofstream(newpath);
 }
 
-fs::path tmp_hex(){
+fs::path gen_tmp_dir(){
 	std::random_device rd;
 	std::uniform_int_distribution<int> dist(0, 16777216);
 	const auto hex = dist(rd);
 	std::ostringstream oss;
-	oss << "c-simplifier-" << std::setw(6) << std::hex << dist(rd);
+	oss << "c-simplifier-" << std::setfill('0') << std::setw(6) << std::hex << dist(rd);
 	const auto result = fs::temp_directory_path() / fs::path(oss.str());
-	return fs::exists(result) ? tmp_hex() : result;
+	return fs::exists(result) ? gen_tmp_dir() : result;
 }
 
 std::string simplify(
@@ -112,7 +117,7 @@ std::string simplify(
 	}
 
 	std::ostringstream oss;
-	const auto tmp_dir = tmp_hex();
+	const auto tmp_dir = gen_tmp_dir();
 	std::cerr << "Tmp dir: " << tmp_dir << std::endl;
 	for (const auto& it : *marker){
 		const auto& filename = it.first;
