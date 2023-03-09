@@ -85,7 +85,7 @@ private:
 	std::unordered_set<const clang::Type *> m_traversed_types;
 
 	std::shared_ptr<ReachabilityMarker> m_marker;
-        const std::unordered_set<std::string>& m_roots;
+	const std::unordered_set<std::string>& m_roots;
 
 	void reset(){
 		m_traversed_decls.clear();
@@ -161,13 +161,13 @@ private:
 
 	void TraverseDetail(const clang::NamespaceDecl *decl, int depth){
 		for(const auto child : decl->decls()){
-			// グローバル変数
+			// global variable
 			if(clang::isa<clang::VarDecl>(child)){ Traverse(child, depth); }
 		}
 	}
 
 	void TraverseDetail(const clang::TypedefNameDecl *decl, int depth){
-		// 別名をつけられた型
+		// aliased type
 		Traverse(decl->getUnderlyingType(), depth);
 	}
 	void TraverseDetail(const clang::CXXRecordDecl *decl, int depth){
@@ -176,19 +176,19 @@ private:
 			return;
 		}
 		for(const auto child : decl->decls()){
-			// アクセス指定子
+			// access specifier
 			if(clang::isa<clang::AccessSpecDecl>(child)){ Traverse(child, depth); }
 		}
-		// 基底クラス
+		// base class
 		for(const auto &base : decl->bases()){ Traverse(base.getType(), depth); }
-		// 仮想基底クラス
+		// virtual base class
 		for(const auto &vbase : decl->vbases()){ Traverse(vbase.getType(), depth); }
-		// ユーザ定義デストラクタ
+		// user-defined destructor
 		if(decl->hasUserDeclaredDestructor()){
 			Traverse(decl->getDestructor(), depth);
 		}
 	}
-        // FIXME: remove? after tests...
+	// FIXME: remove? after tests...
 	void TraverseDetail(const clang::EnumDecl *decl, int depth){
 		for(const auto child : decl->decls()) {
 			Traverse(child, depth);
@@ -196,9 +196,9 @@ private:
 	}
 
 	void TraverseDetail(const clang::ClassTemplateSpecializationDecl *decl, int depth){
-		// 特殊化元クラステンプレート
+		// specialization source class template
 		Traverse(decl->getSpecializedTemplate(), depth);
-		// 特殊化元が部分特殊化されたクラステンプレートの場合
+		// if the specialization source is a partially specialized class template
 		const auto from = decl->getInstantiatedFrom();
 		if(from.is<clang::ClassTemplatePartialSpecializationDecl *>()){
 			Traverse(
@@ -206,85 +206,86 @@ private:
 		}
 	}
 	void TraverseDetail(const clang::TemplateDecl *decl, int depth){
-		// テンプレート引数
+		// template argument
 		for(const auto param : *(decl->getTemplateParameters())){
 			Traverse(param, depth);
 		}
 	}
 	void TraverseDetail(const clang::ClassTemplateDecl *decl, int depth){
-		// 特殊化元レコード型
+		// specialization source record type
 		Traverse(decl->getTemplatedDecl(), depth);
 	}
 
 	void TraverseDetail(const clang::ValueDecl *decl, int depth){
-		// 対応する型
+		// corresponding type
 		Traverse(decl->getType(), depth);
 	}
 	void TraverseDetail(const clang::FieldDecl *decl, int depth){
-		// ビットフィールドの幅
+		// width of bitfield
 		if(decl->isBitField()){ Traverse(decl->getBitWidth(), depth); }
-		// メンバ初期化子
+		// member initializer
 		if(decl->hasInClassInitializer()){
 			Traverse(decl->getInClassInitializer(), depth);
 		}
+		// fixed-size array members can refer to other expressions for their length
 		if(decl->getTypeSourceInfo()){
                         constantArrayHack(*decl->getTypeSourceInfo(), depth);
 		}
 	}
-        // FIXME: remove? after tests...
+	// FIXME: remove? after tests...
 	void TraverseDetail(const clang::EnumConstantDecl *decl, int depth){
 		Traverse(decl->getType(), depth);
 	}
 
 	void TraverseDetail(const clang::FunctionDecl *decl, int depth){
-		// テンプレート関数の特殊化元
+		// template function specialization source
 		if(decl->isFunctionTemplateSpecialization()){
 			Traverse(decl->getPrimaryTemplate(), depth);
 		}
-		// 引数
+		// argument
 		for(unsigned int i = 0; i < decl->getNumParams(); ++i){
 			Traverse(decl->getParamDecl(i), depth);
 		}
-		// 処理内容
+		// processing content (body)
 		if(decl->hasBody()){ Traverse(decl->getBody(), depth); }
-		// 戻り値の型
+		// return type
 		Traverse(decl->getReturnType(), depth);
 	}
 	void TraverseDetail(const clang::CXXConstructorDecl *decl, int depth){
-		// 初期化リスト
+		// initialization list
 		for(const auto init : decl->inits()){
 			if(init->getMember()){ Traverse(init->getMember(), depth); }
 			Traverse(init->getInit(), depth);
 		}
 	}
 	void TraverseDetail(const clang::VarDecl *decl, int depth){
-		// 初期化式
+		// initialization expression
 		if(decl->hasInit()){ Traverse(decl->getInit(), depth); }
-		// 型情報
+		// type intelligence
+		// fixed-size array members can refer to other expressions for their length
 		if(decl->getTypeSourceInfo()){
 			constantArrayHack(*decl->getTypeSourceInfo(), depth);
 		}
 	}
-        void constantArrayHack(const clang::TypeSourceInfo& typeSourceInfo, int depth){
-                const auto& type = typeSourceInfo.getType();
-                if (clang::isa<clang::ConstantArrayType>(type.getTypePtrOrNull())){
-                        Traverse(typeSourceInfo.getTypeLoc(), depth);
-                } else {
-                        Traverse(type, depth);
-                }
-        }
+	void constantArrayHack(const clang::TypeSourceInfo& typeSourceInfo, int depth){
+		const auto& type = typeSourceInfo.getType();
+		if (clang::isa<clang::ConstantArrayType>(type.getTypePtrOrNull())){
+			Traverse(typeSourceInfo.getTypeLoc(), depth);
+		} else {
+			Traverse(type, depth);
+		}
+	}
 	void TraverseDetail(const clang::ParmVarDecl *decl, int depth){
-		// デフォルト引数
+		// default argument
 		if(decl->hasDefaultArg()){ Traverse(decl->getDefaultArg(), depth); }
 		if(decl->getTypeSourceInfo()){
 			constantArrayHack(*decl->getTypeSourceInfo(), depth);
 		}
 	}
 
-        void debug(int depth, const std::string type, const std::string& info){
-            std::cerr << std::string(depth * 2, ' ')
-                << type << ": " << info << std::endl;
-        }
+	void debug(int depth, const std::string type, const std::string& info){
+		std::cerr << std::string(depth * 2, ' ') << type << ": " << info << std::endl;
+	}
 
 	//------------------------------------------------------------------------
 	// Statements
@@ -310,13 +311,13 @@ private:
 	}
 
 	void TraverseDetail(const clang::DeclStmt *stmt, int depth){
-		// 子として含まれている定義すべて
+		// all definitions included as children
 		for(const auto decl : stmt->decls()){ Traverse(decl, depth); }
 	}
 	void TraverseDetail(const clang::DeclRefExpr *expr, int depth){
-		// 参照が指している定義
+		// the definition the reference points to
 		Traverse(expr->getDecl(), depth);
-		// テンプレート引数
+		// template argument
 		for(unsigned int i = 0; i < expr->getNumTemplateArgs(); ++i){
 			Traverse(expr->getTemplateArgs()[i], depth);
 		}
@@ -325,35 +326,35 @@ private:
 		}
 	}
 	void TraverseDetail(const clang::MemberExpr *expr, int depth){
-		// メンバの定義
+		// member defintion
 		Traverse(expr->getMemberDecl(), depth);
-		// テンプレート引数
+		// template argument
 		for(unsigned int i = 0; i < expr->getNumTemplateArgs(); ++i){
 			Traverse(expr->getTemplateArgs()[i], depth);
 		}
 	}
-        void TraverseDetail(const clang::InitListExpr *expr, int depth){
-            if(const auto syntactic = expr->getSyntacticForm()) {
-                    Traverse(syntactic, depth);
-            }
-        }
-        void TraverseDetail(const clang::DesignatedInitExpr *expr, int depth){
-                for(const auto child : expr->designators()){
-                        if(const auto field = child.getField()) {
-                                Traverse(field, depth + 1);
-                        }
-                }
-        }
+	void TraverseDetail(const clang::InitListExpr *expr, int depth){
+		if(const auto syntactic = expr->getSyntacticForm()) {
+			Traverse(syntactic, depth);
+		}
+	}
+	void TraverseDetail(const clang::DesignatedInitExpr *expr, int depth){
+		for(const auto child : expr->designators()){
+			if(const auto field = child.getField()) {
+				Traverse(field, depth + 1);
+			}
+		}
+	}
 	void TraverseDetail(const clang::CallExpr *expr, int depth){
-		// 呼び出される関数
+		// function to be called
 		Traverse(expr->getCallee(), depth);
 	}
 	void TraverseDetail(const clang::CXXConstructExpr *expr, int depth){
-		// コンストラクタの定義
+		// constructor definition
 		Traverse(expr->getConstructor(), depth);
 	}
 	void TraverseDetail(const clang::ExplicitCastExpr *expr, int depth){
-		// キャスト先の型
+		// type to cast to
 		Traverse(expr->getTypeAsWritten(), depth);
 	}
 	void TraverseDetail(const clang::UnaryExprOrTypeTraitExpr *expr, int depth){
@@ -367,23 +368,21 @@ private:
 	//------------------------------------------------------------------------
 	// TypeLocs
 	//------------------------------------------------------------------------
-        template<typename T>
-        void TestAndTraverse(const clang::TypeLoc typeloc, int depth){
-               const auto typeloc2 = typeloc.getAsAdjusted<T>();
-               if (!typeloc2.isNull()) TraverseDetail(typeloc2, depth);
-        }
-
-	void Traverse(const clang::TypeLoc typeloc, int depth){
-
-		SIMP_DEBUG(debug(depth, "TL", typeloc.getType()->getTypeClassName()));
-
-                TestAndTraverse<clang::ConstantArrayTypeLoc>(typeloc, depth+1);
+	template<typename T>
+	void TestAndTraverse(const clang::TypeLoc typeloc, int depth){
+		const auto typeloc2 = typeloc.getAsAdjusted<T>();
+		if (!typeloc2.isNull()) TraverseDetail(typeloc2, depth);
 	}
 
-        void TraverseDetail(const clang::ConstantArrayTypeLoc typeloc, int depth){
-                Traverse(typeloc.getInnerType(), depth);
-                Traverse(typeloc.getSizeExpr(), depth);
-        }
+	void Traverse(const clang::TypeLoc typeloc, int depth){
+		SIMP_DEBUG(debug(depth, "TL", typeloc.getType()->getTypeClassName()));
+		TestAndTraverse<clang::ConstantArrayTypeLoc>(typeloc, depth+1);
+	}
+
+	void TraverseDetail(const clang::ConstantArrayTypeLoc typeloc, int depth){
+		Traverse(typeloc.getInnerType(), depth);
+		Traverse(typeloc.getSizeExpr(), depth);
+	}
 
 	//------------------------------------------------------------------------
 	// Types
@@ -415,23 +414,23 @@ private:
 	}
 
 	void TraverseDetail(const clang::PointerType *type, int depth){
-		// デリファレンスした型
+		// dereferenced type
 		Traverse(type->getPointeeType(), depth);
 	}
 	void TraverseDetail(const clang::ReferenceType *type, int depth){
-		// デリファレンスした型
+		// dereferenced type
 		Traverse(type->getPointeeType(), depth);
 	}
 	void TraverseDetail(const clang::ArrayType *type, int depth){
-		// 要素の型
+		// element type
 		Traverse(type->getElementType(), depth);
 	}
 	void TraverseDetail(const clang::ConstantArrayType *type, int depth){
-		// 要素の型
+		// element type
 		Traverse(type->getElementType(), depth);
 	}
 	void TraverseDetail(const clang::AttributedType *type, int depth){
-		// 修飾された型
+		// qualified type
 		Traverse(type->getModifiedType(), depth);
 	}
 	void TraverseDetail(const clang::TypeOfType *type, int depth){
@@ -445,31 +444,31 @@ private:
 		Traverse(type->getInnerType(), depth);
 	}
 	void TraverseDetail(const clang::AutoType *type, int depth){
-		// 型推論の結果
+		// result of type inference
 		Traverse(type->getDeducedType(), depth);
 	}
 	void TraverseDetail(const clang::DecltypeType *type, int depth){
-		// 推論に使用した式
+		// formula used for inference
 		Traverse(type->getUnderlyingExpr(), depth);
-		// 型推論の結果
+		// result of type inference
 		Traverse(type->getUnderlyingType(), depth);
 	}
 	void TraverseDetail(const clang::RecordType *type, int depth){
-		// 構造体の定義
+		// structure definition
 		Traverse(type->getDecl(), depth);
 	}
 	void TraverseDetail(const clang::EnumType *type, int depth){
-		// 構造体の定義
+		// structure (enum?) definition
 		Traverse(type->getDecl(), depth);
 	}
 	void TraverseDetail(const clang::TypedefType *type, int depth){
-		// 別名の定義
+		// alias definition
 		Traverse(type->getDecl(), depth);
 	}
 	void TraverseDetail(const clang::TemplateSpecializationType *type, int depth){
 		const auto t = type->getTemplateName();
 		Traverse(t.getAsTemplateDecl(), depth);
-		// テンプレート引数
+		// template argument
 		for(unsigned int i = 0; i < type->getNumArgs(); ++i){
 			Traverse(type->getArgs()[i], depth);
 		}
@@ -559,9 +558,9 @@ private:
 		//if(m_source_manager->getFileID(begin) != main_file_id){ return; }
 		const auto begin_line = m_source_manager->getPresumedLineNumber(begin) - 1;
 		const auto end_line = m_source_manager->getPresumedLineNumber(end) - 1;
-                const auto presumed = m_source_manager->getPresumedLoc(begin);
-                if (presumed.isInvalid()) return;
-                const auto filename = std::string(presumed.getFilename());
+		const auto presumed = m_source_manager->getPresumedLoc(begin);
+		if (presumed.isInvalid()) return;
+		const auto filename = std::string(presumed.getFilename());
 		for(unsigned int i = begin_line; i <= end_line; ++i){
 			m_marker->mark(filename, i);
 		}
