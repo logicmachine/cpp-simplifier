@@ -67,13 +67,13 @@
 /*  SOFTWARE.                                                                       */
 /************************************************************************************/
 
-#include <fstream>
-#include <sstream>
-#include <memory>
 #include <filesystem>
-#include <iostream>
+#include <fstream>
 #include <iomanip>
+#include <iostream>
+#include <memory>
 #include <random>
+#include <sstream>
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Tooling/Tooling.h>
 #include <clang/Tooling/CompilationDatabase.h>
@@ -85,10 +85,10 @@ namespace tl = clang::tooling;
 namespace fs = std::filesystem;
 
 std::ofstream create(const fs::path tmp_dir, const fs::path& filepath){
-        if (filepath.is_absolute()) {
-            std::cerr << "Please fix compile_commands.json to use relative path for " << filepath << std::endl;
-            std::exit(1);
-        }
+	if (filepath.is_absolute()) {
+		std::cerr << "Please fix compile_commands.json to use relative path for " << filepath << std::endl;
+		std::exit(1);
+	}
 	// operator/ returns the RHS if it is an absolute path, which overwrites the user's file!
 	const auto newpath = tmp_dir / filepath;
 	fs::create_directories(fs::path(newpath).remove_filename());

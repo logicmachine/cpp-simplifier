@@ -67,21 +67,26 @@
 /*  SOFTWARE.                                                                       */
 /************************************************************************************/
 
-#include <sstream>
+#include <cstring>
 #include <iostream>
+#include <sstream>
 #include <unordered_set>
-#include <clang/AST/ExprCXX.h>
 #include <clang/AST/DeclCXX.h>
 #include <clang/AST/DeclTemplate.h>
+#include <clang/AST/ExprCXX.h>
 #include "reachability_analyzer.hpp"
+
+const clang::FileID LocToFileID(clang::SourceLocation loc, const clang::SourceManager& sm){
+	return sm.getFileID(sm.getSpellingLoc(loc));
+}
 
 std::string RangeToString(clang::SourceRange range, const clang::SourceManager& sm){
 	const auto begin = sm.getPresumedLoc(range.getBegin());
 	const auto end = sm.getPresumedLoc(range.getEnd());
 	if (!begin.isValid() || !end.isValid()) { return std::string("invalid"); }
-	const auto diff_files = std::string(begin.getFilename()) != std::string(end.getFilename());
+	const auto same_files = begin.getFileID() == end.getFileID();
 	std::ostringstream result;
-	if (!diff_files)
+	if (same_files)
 		result << begin.getFilename() << ", " << begin.getLine() << ':' << begin.getColumn() << " - "
 			<< end.getLine() << ':' << end.getColumn();
 	else
@@ -239,8 +244,7 @@ private:
 		// if the specialization source is a partially specialized class template
 		const auto from = decl->getInstantiatedFrom();
 		if(from.is<clang::ClassTemplatePartialSpecializationDecl *>()){
-			Traverse(
-				from.get<clang::ClassTemplatePartialSpecializationDecl *>(), depth);
+			Traverse(from.get<clang::ClassTemplatePartialSpecializationDecl *>(), depth);
 		}
 	}
 	void TraverseDetail(const clang::TemplateDecl *decl, int depth){
@@ -678,23 +682,19 @@ private:
 	}
 
 	clang::SourceLocation EndOfHead(const clang::Decl *decl){
-		auto loc = decl->getEndLoc();
-		if(clang::isa<clang::DeclContext>(decl)){
-			const auto context = clang::dyn_cast<clang::DeclContext>(decl);
+		auto min_loc = decl->getEndLoc();
+		if(const auto context = clang::dyn_cast<clang::DeclContext>(decl)){
 			for(const auto child : context->decls()){
 				if(child->isImplicit()){ continue; }
-				const auto a =
-					m_source_manager->getPresumedLineNumber(loc);
-				const auto b =
-					m_source_manager->getPresumedLineNumber(child->getBeginLoc());
-				if(b < a){ loc = child->getBeginLoc(); }
+				const auto a = m_source_manager->getPresumedLineNumber(min_loc);
+				const auto b = m_source_manager->getPresumedLineNumber(child->getBeginLoc());
+				if(b < a){ min_loc = child->getBeginLoc(); }
 			}
-			const auto a =
-				m_source_manager->getPresumedLineNumber(decl->getBeginLoc());
-			const auto b = m_source_manager->getPresumedLineNumber(loc);
-			if(b > a){ loc = PreviousLine(loc); }
+			const auto a = m_source_manager->getPresumedLineNumber(decl->getBeginLoc());
+			const auto b = m_source_manager->getPresumedLineNumber(min_loc);
+			if(b > a){ min_loc = PreviousLine(min_loc); }
 		}
-		return loc;
+		return min_loc;
 	}
 
 	bool MarkRecursiveFiltered(const clang::Decl *decl, int depth){
