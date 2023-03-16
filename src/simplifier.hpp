@@ -76,7 +76,8 @@
 std::string simplify(
 	clang::tooling::ClangTool &tool,
 	const std::string &input_filname,
-	const std::unordered_set<std::string> &roots);
+	const std::unordered_set<std::string> &roots,
+	const bool omit_lines);
 
 #endif
 

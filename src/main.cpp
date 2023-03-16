@@ -98,6 +98,9 @@ cl::opt<bool, true> debugOpt("d",
 	cl::desc("Enable debug output on stderr"),
 	cl::location(debugOn),
 	cl::cat(simplifier_category));
+cl::opt<bool> omit_lines("omit-lines",
+	cl::desc("Omit lines instead of commenting them out"),
+	cl::cat(simplifier_category));
 
 static const std::regex clang13_only_flags(
     "-Wno-psabi"
@@ -116,7 +119,6 @@ static tl::CommandLineArguments remove_clang13_only_flags(
 	std::copy_if(args.begin(), args.end(), result.begin(), [](const std::string& s){
 	        return !std::regex_match(s, clang13_only_flags);
 	});
-	result.push_back("-fparse-all-comments");
 	result.push_back("-Xclang");
 	result.push_back("-detailed-preprocessing-record");
 	return result;
@@ -137,12 +139,8 @@ int main(int argc, const char *argv[]){
 	tl::ClangTool tool(options_parser.getCompilations(), llvm::ArrayRef<std::string>(filename));
 	tool.appendArgumentsAdjuster(remove_clang13_only_flags);
 
-	// TODO delete this (not needed, messing up locations)
-	// TODO OR track all pp directive/macro sources
-	// unroll_inclusion(tool, filename);
-
 	const std::unordered_set<std::string> rootSet(roots.begin(), roots.end());
-	const auto result = simplify(tool, filename, rootSet);
+	const auto result = simplify(tool, filename, rootSet, omit_lines);
 
 	if(!output_filename.empty()){
 		std::ofstream ofs(output_filename.c_str());

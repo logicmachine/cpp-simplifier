@@ -81,7 +81,7 @@ def run_simplify(minifier_path, input_path):
     rel_input = os.path.relpath(input_path, cwd)
     with open('compile_commands.json', 'w') as compile_cmds:
         json.dump([{ "directory": cwd, "command": "clang -c " + rel_input, "file" : rel_input }], compile_cmds)
-    proc = subprocess.Popen([minifier_path, input_path], stdout=subprocess.PIPE)
+    proc = subprocess.Popen([minifier_path, "--omit-lines", input_path], stdout=subprocess.PIPE)
     result = proc.communicate()[0].decode('utf-8')
     os.remove('compile_commands.json')
     return result

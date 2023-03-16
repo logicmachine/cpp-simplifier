@@ -108,7 +108,8 @@ fs::path gen_tmp_dir(){
 std::string simplify(
 	tl::ClangTool &tool,
 	const std::string &input_filename,
-	const std::unordered_set<std::string> &roots)
+	const std::unordered_set<std::string> &roots,
+	const bool omit_lines)
 {
 	auto marker = std::make_shared<ReachabilityMarker>();
 	ReachabilityAnalyzerFactory analyzer_factory(marker, roots);
@@ -131,7 +132,14 @@ std::string simplify(
 			if(std::getline(iss, line)){
 				unsigned int j = 0;
 				while(j < line.size() && isspace(line[j])){ ++j; }
-				if(/*line[j] == '#' || */ marked[i]){
+				// TODO - tidy this nonsense up
+				if (omit_lines) {
+					if(marked[i]){
+						ofs << line << std::endl;
+						if (also_oss) oss << line << std::endl;
+					}
+				} else {
+					if(!marked[i]) { ofs << "//-"; if (also_oss) oss << "//-"; }
 					ofs << line << std::endl;
 					if (also_oss) oss << line << std::endl;
 				}
