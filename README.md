@@ -151,11 +151,12 @@ In the `/tmp` directory you will then find:
 - [x] C constructs required for `kvm_pgtable_walk` in `pgtable.c`
 - [x] Command line interface and support for `compile_commands.json`
 - [x] Support for reproducing directory structure
-- [X] Support multiline macros
+- [X] Fix up tests
+- [X] Support macro dependencies
 - [X] Comment out instead of ommitting irrelevant lines
+- [ ] Add new tests for new functionality
 - [ ] Support retaining relevant includes
 - [ ] Example for README.md
-- [ ] Fix up tests (and add new ones)
 - [ ] Update .travis.yml
 
 ## Funding
