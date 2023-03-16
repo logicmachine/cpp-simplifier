@@ -151,7 +151,8 @@ In the `/tmp` directory you will then find:
 - [x] C constructs required for `kvm_pgtable_walk` in `pgtable.c`
 - [x] Command line interface and support for `compile_commands.json`
 - [x] Support for reproducing directory structure
-- [ ] Mark `#include` and `#define` (especially multiline ones!)
+- [X] Support multiline macros
+- [ ] Support retaining relevant includes
 - [ ] Preprocess file within tool to retain all comments (including licence headers)
 - [ ] Example for README.md
 - [ ] Fix up tests (and add new ones)
