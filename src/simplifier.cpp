@@ -126,23 +126,21 @@ std::string simplify(
 		std::cerr << "Outputting: " << filename << std::endl;
 		auto ofs = create(tmp_dir, fs::path(filename));
 		const auto& marked = it.second;
+		// open file and iterate line by line
 		std::ifstream iss(filename);
-		for(unsigned int i = 0; i < marked.size() && !iss.eof(); ++i){
-			std::string line;
-			if(std::getline(iss, line)){
-				unsigned int j = 0;
-				while(j < line.size() && isspace(line[j])){ ++j; }
-				// TODO - tidy this nonsense up
-				if (omit_lines) {
-					if(marked[i]){
-						ofs << line << std::endl;
-						if (also_oss) oss << line << std::endl;
-					}
-				} else {
-					if(!marked[i]) { ofs << "//-"; if (also_oss) oss << "//-"; }
+		std::string line;
+		for(unsigned int i = 0; std::getline(iss, line); ++i){
+			const auto marked_i = i < marked.size() && marked[i];
+			// TODO - tidy this nonsense up
+			if (omit_lines) {
+				if(marked_i){
 					ofs << line << std::endl;
 					if (also_oss) oss << line << std::endl;
 				}
+			} else {
+				if(!marked_i) { ofs << "//-"; if (also_oss) oss << "//-"; }
+				ofs << line << std::endl;
+				if (also_oss) oss << line << std::endl;
 			}
 		}
 	}
