@@ -123,6 +123,15 @@ void MarkRangeSM(const clang::SourceRange& range, const clang::SourceManager& sm
 	for(unsigned int i = begin_line; i <= end_line; ++i){
 		marker->mark(filename, i);
 	}
+
+	for (auto includedBy = sm.getPresumedLoc(presumed.getIncludeLoc());
+		includedBy.isValid();
+		includedBy = sm.getPresumedLoc(includedBy.getIncludeLoc())) {
+
+		const auto filename = std::string(includedBy.getFilename());
+		SIMP_DEBUG(std::cerr << "    Incl " << filename << ':' << includedBy.getLine() << std::endl);
+		if (filename != "<built-in>") marker->mark(filename, includedBy.getLine() - 1);
+	}
 }
 
 

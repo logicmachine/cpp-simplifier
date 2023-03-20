@@ -154,8 +154,8 @@ In the `/tmp` directory you will then find:
 - [X] Fix up tests
 - [X] Support macro dependencies
 - [X] Comment out instead of ommitting irrelevant lines
+- [X] Support retaining relevant includes
 - [ ] Add new tests for new functionality
-- [ ] Support retaining relevant includes
 - [ ] Example for README.md
 - [ ] Update .travis.yml
 
