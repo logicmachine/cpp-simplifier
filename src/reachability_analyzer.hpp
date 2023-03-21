@@ -96,7 +96,7 @@ public:
 	using Map = std::unordered_map<clang::SourceRange, SourceRangeSet, SourceRangeHash>;
 private:
 	Map& m_macro_deps;
-	clang::SourceManager &m_sm;
+	const clang::SourceManager &m_sm;
 public:
         clang::SourceRange defn_range(const clang::MacroDefinition& MD) {
 		auto macro_info= MD.getMacroInfo();
@@ -126,7 +126,7 @@ public:
 		}
 	}
 	PPRecordNested(Map& macro_deps
-		, clang::SourceManager& sm)
+		, const clang::SourceManager& sm)
 		: clang::PPCallbacks()
 		, m_macro_deps(macro_deps)
 		, m_sm(sm)
@@ -146,7 +146,7 @@ protected:
 
 	void findMacroDefns(
 		clang::PreprocessingRecord& pr,
-		clang::SourceManager& sm,
+		const clang::SourceManager& sm,
 		clang::SourceRange range,
 		const PPRecordNested::Map& macro_deps,
 		SourceRangeSet& marked);

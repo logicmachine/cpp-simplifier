@@ -119,11 +119,11 @@ std::string simplify(
 
 	std::ostringstream oss;
 	const auto tmp_dir = gen_tmp_dir();
-	std::cerr << "Tmp dir: " << tmp_dir << std::endl;
+	SIMP_DEBUG(std::cerr << "Tmp dir: " << tmp_dir << std::endl);
 	for (const auto& it : *marker){
 		const auto& filename = it.first;
 		const auto also_oss = input_filename.find(filename) != std::string::npos;
-		std::cerr << "Outputting: " << filename << std::endl;
+		SIMP_DEBUG(std::cerr << "Outputting: " << filename << std::endl);
 		auto ofs = create(tmp_dir, fs::path(filename));
 		const auto& marked = it.second;
 		// open file and iterate line by line

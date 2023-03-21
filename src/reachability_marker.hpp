@@ -90,13 +90,6 @@ public:
 		marker[line] = true;
 	}
 
-	void unmark(const std::string file, unsigned int line){
-		if((*this)(file, line)){
-			auto& marker = m_map.at(file);
-			marker[line] = false;
-		}
-	}
-
 	bool operator()(const std::string file, unsigned int line) const {
 		if (m_map.find(file) == m_map.end()){ return false; }
 		const auto& marker = m_map.at(file);

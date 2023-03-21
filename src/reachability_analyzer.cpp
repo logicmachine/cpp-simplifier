@@ -91,7 +91,7 @@ std::string RangeToString(clang::SourceRange range, const clang::SourceManager& 
 	return result.str();
 }
 
-void debugSM(int depth, char type, const clang::Decl* decl, const clang::SourceManager& sm){
+void debugDecl(int depth, char type, const clang::Decl* decl, const clang::SourceManager& sm){
 	std::cerr << std::string(depth * 2, ' ')
 	          << type << ": " << decl->getDeclKindName();
 	if(clang::isa<clang::NamedDecl>(decl)){
@@ -102,38 +102,45 @@ void debugSM(int depth, char type, const clang::Decl* decl, const clang::SourceM
 
 	std::cerr << RangeToString(decl->getSourceRange(), sm) << std::endl;
 }
+
 void debugStr(int depth, const std::string type, const std::string& info){
 	std::cerr << std::string(depth * 2, ' ') << type << ": " << info << std::endl;
 }
-void MarkRangeSM(const clang::SourceRange& range, const clang::SourceManager& sm,
+
+void MarkRangeDSM(int depth, const clang::SourceRange& range, const clang::SourceManager& sm,
 	const std::shared_ptr<ReachabilityMarker> marker){
-	//const auto main_file_id = m_source_manager->getMainFileID();
-	const auto begin = range.getBegin();
-	const auto end = range.getEnd();
 
-	//if(m_source_manager->getFileID(begin) != main_file_id){ return; }
-	const auto begin_line = sm.getPresumedLineNumber(begin) - 1;
-	const auto end_line = sm.getPresumedLineNumber(end) - 1;
-	const auto presumed = sm.getPresumedLoc(begin);
-        if (presumed.isInvalid()) { return; }
+	const auto begin = sm.getPresumedLoc(range.getBegin());
+	const auto end = sm.getPresumedLoc(range.getEnd());
+	if (begin.isInvalid() || end.isInvalid() || begin.getFileID() != end.getFileID()){
+		SIMP_DEBUG(debugStr(depth, "Skip marking invalid loc", ""));
+		return;
+	}
 
-	SIMP_DEBUG(debugStr(1, "Mark " + RangeToString(range, sm), " "));
-
-	const auto filename = std::string(presumed.getFilename());
-	for(unsigned int i = begin_line; i <= end_line; ++i){
+	SIMP_DEBUG(debugStr(depth, "Mark " + RangeToString(range, sm), ""));
+	const auto filename = std::string(begin.getFilename());
+	for(unsigned int i = begin.getLine() - 1; i < end.getLine(); ++i){
 		marker->mark(filename, i);
 	}
 
-	for (auto includedBy = sm.getPresumedLoc(presumed.getIncludeLoc());
+	// If the definition locations being marked are in a header file,
+	// then we also need to mark the chain of includes leading to that
+	// definition being availabled and used.
+	for (auto includedBy = sm.getPresumedLoc(begin.getIncludeLoc());
 		includedBy.isValid();
 		includedBy = sm.getPresumedLoc(includedBy.getIncludeLoc())) {
 
 		const auto filename = std::string(includedBy.getFilename());
-		SIMP_DEBUG(std::cerr << "    Incl " << filename << ':' << includedBy.getLine() << std::endl);
-		if (filename != "<built-in>") marker->mark(filename, includedBy.getLine() - 1);
+		if (filename == "<built-in>") break;
+		SIMP_DEBUG(debugStr(depth + 1, "Incl " + filename + ":" + std::to_string(includedBy.getLine()), ""));
+		marker->mark(filename, includedBy.getLine() - 1);
 	}
 }
 
+void MarkRangeSM(const clang::SourceRange& range, const clang::SourceManager& sm,
+	const std::shared_ptr<ReachabilityMarker> marker){
+	MarkRangeDSM(1, range, sm, marker);
+}
 
 class ReachabilityAnalyzer::ASTConsumer : public clang::ASTConsumer {
 
@@ -166,14 +173,13 @@ private:
 	}
 
 	void debug(int depth, char type, const clang::Decl* decl){
-		debugSM(depth, type, decl, *m_source_manager);
+		debugDecl(depth, type, decl, *m_source_manager);
 	}
 	//------------------------------------------------------------------------
 	// Declarations
 	//------------------------------------------------------------------------
 	void Traverse(const clang::Decl *decl, int depth){
-		if(!decl){ return; }
-		if(!m_traversed_decls.insert(decl).second){ return; }
+		if(!decl || !m_traversed_decls.insert(decl).second){ return; }
 
 		SIMP_DEBUG(debug(depth, 'D', decl));
 
@@ -187,8 +193,8 @@ private:
 			}
 		}
 
-		// Ordering here is annoyingly important/brittle
-		// subclasses need to be tested first
+		// You only need to recurse on the special cases
+		// Ordering here is important & brittle: subclasses need to be tested first
 		TestAndTraverse<clang::NamespaceDecl>(decl, depth);
 
 		TestAndTraverse<clang::TypedefNameDecl>(decl, depth);
@@ -841,37 +847,44 @@ std::unique_ptr<clang::ASTConsumer> ReachabilityAnalyzer::CreateASTConsumer(
 	return std::make_unique<ASTConsumer>(m_marker, m_roots, m_ranges);
 }
 
-void ReachabilityAnalyzer::findMacroDefns(clang::PreprocessingRecord& pr, clang::SourceManager& sm, clang::SourceRange range,
+bool actualFile(clang::SourceRange defn_range, const clang::SourceManager& sm){
+	const auto presumed = sm.getPresumedLoc(defn_range.getBegin());
+	assert(presumed.isValid());
+	auto result = std::strcmp(presumed.getFilename(), "<built-in>") != 0
+		&& std::strcmp(presumed.getFilename(), "<command line>") != 0;
+	if (!result) SIMP_DEBUG(debugStr(2, "Not from a file", ""));
+	return result;
+}
+
+void ReachabilityAnalyzer::findMacroDefns(clang::PreprocessingRecord& pr, const clang::SourceManager& sm, clang::SourceRange range,
 	const PPRecordNested::Map& macro_deps, SourceRangeSet& marked){
-	std::cerr << "Macro expansions in " << RangeToString(range, sm) << std::endl;
-	const auto depth = "    ";
+	SIMP_DEBUG(debugStr(0, "Macro expansions in " + RangeToString(range, sm), ""));
 	const auto inRange = pr.getPreprocessedEntitiesInRange(range);
 	for (const auto* entity : inRange) {
-		if (!entity) { std::cerr << "sad entity :(" << std::endl; continue; }
+		assert(entity);
 		if(const auto macro_exp = clang::dyn_cast<clang::MacroExpansion>(entity)){
-			const auto *id_info = macro_exp->getName();
+			SIMP_DEBUG(debugStr(1, macro_exp->getName()->getNameStart(), ""));
+			SIMP_DEBUG(debugStr(2, "Expanded at " + RangeToString(macro_exp->getSourceRange(), sm), ""));
 			const auto defn_range = macro_exp->getDefinition()->getSourceRange();
-			std::cerr << "  " << id_info->getNameStart() << std::endl;
-			std::cerr << depth << "Expanded at " << RangeToString(macro_exp->getSourceRange(), sm) << std::endl;
-                        std::cerr << depth << "Defined " << RangeToString(defn_range, sm) << std::endl;
-			{
-				const auto presumed = sm.getPresumedLoc(defn_range.getBegin());
-                                assert(presumed.isValid());
-				const auto filename = std::string(presumed.getFilename());
-				if (filename == "<built-in>" || filename == "<command line>") {
-					std::cerr << depth << "not from a file" << std::endl;
-				        continue;
-				}
+			SIMP_DEBUG(debugStr(2, "Defined " + RangeToString(defn_range, sm), ""));
+
+			// Not built-in, from command line, nor already marked
+			if (actualFile(defn_range, sm) && marked.find(defn_range) == marked.end()){
+				MarkRangeDSM(2, defn_range, sm, m_marker);
+				marked.emplace(defn_range);
 			}
-			MarkRangeSM(defn_range, sm, m_marker);
-			marked.emplace(defn_range);
+
 			const auto dep_ranges = macro_deps.find(defn_range);
-			if (dep_ranges == macro_deps.end()){ /* macro with no dependencies */ continue; }
+			// skip if macro has no dependencies
+			if (dep_ranges == macro_deps.end()) continue;
+
+			// mark all macros used by this macro
 			for (const auto& dep_range : dep_ranges->second){
-				std::cerr << depth << "Uses " << RangeToString(dep_range, sm) << std::endl;
-				if (marked.find(dep_range) == marked.end()) { continue; }
-				MarkRangeSM(dep_range, sm, m_marker);
-				marked.emplace(dep_range);
+				SIMP_DEBUG(debugStr(2, "Uses " + RangeToString(dep_range, sm), ""));
+				if (marked.find(dep_range) == marked.end()) {
+					MarkRangeDSM(3, dep_range, sm, m_marker);
+					marked.emplace(dep_range);
+				}
 			}
 		}
 	}
@@ -884,22 +897,27 @@ void ReachabilityAnalyzer::findMacroDefns(clang::PreprocessingRecord& pr, clang:
 //    back up to the source.
 // 3. It seems difficult/not sensible to re-lex/pp the macro _definition_ to get at the macros
 //    it refers to.
-// Therefore, we need to add a PPCallback that records _all_ macro expansions, even that occur
+// Therefore, we add a PPCallback that records _all_ macro expansions, even those that occur
 // within a macro.
-// We should however, be able to use emitIncludeStack to get the transitive source of a macro.
 void ReachabilityAnalyzer::ExecuteAction()
 {
 	auto &ci = getCompilerInstance();
 	auto &pp = ci.getPreprocessor();
 	PPRecordNested::Map macro_deps;
-	auto &sm = ci.getSourceManager();
+	const auto &sm = ci.getSourceManager();
 	pp.addPPCallbacks(std::make_unique<PPRecordNested>(macro_deps, sm));
 
+	// this runs the pre-processor and declaration traversal & marking
 	ASTFrontendAction::ExecuteAction();
+
+	// you need this for `PreprocessingRecord::getPreprocessedEntitiesInRange`
 	auto *pr = pp.getPreprocessingRecord();
 	if (!pr) {
-		std::cerr << "No preprocessing record found :(" << std::endl;
+		SIMP_DEBUG(std::cerr << "No preprocessing record found :(" << std::endl);
+		return;
 	}
+
+	// mark the marcros used inside all declaration ranges
 	SourceRangeSet marked;
 	for (const auto& range : m_ranges) findMacroDefns(*pr, sm, range, macro_deps, marked);
 }
