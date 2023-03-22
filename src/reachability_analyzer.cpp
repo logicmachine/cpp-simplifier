@@ -195,12 +195,10 @@ private:
 
 		// You only need to recurse on the special cases
 		// Ordering here is important & brittle: subclasses need to be tested first
-		TestAndTraverse<clang::NamespaceDecl>(decl, depth);
 
 		TestAndTraverse<clang::TypedefNameDecl>(decl, depth);
 			TestAndTraverse<clang::ClassTemplateSpecializationDecl>(decl, depth);
 		TestAndTraverse<clang::CXXRecordDecl>(decl, depth);
-		TestAndTraverse<clang::EnumDecl>(decl, depth);
 			TestAndTraverse<clang::ClassTemplateDecl>(decl, depth);
 		TestAndTraverse<clang::TemplateDecl>(decl, depth);
 
@@ -211,13 +209,6 @@ private:
 				TestAndTraverse<clang::CXXConstructorDecl>(decl, depth);
 			TestAndTraverse<clang::FunctionDecl>(decl, depth);
 		TestAndTraverse<clang::ValueDecl>(decl, depth);
-	}
-
-	void TraverseDetail(const clang::NamespaceDecl *decl, int depth){
-		for(const auto child : decl->decls()){
-			// global variable
-			if(clang::isa<clang::VarDecl>(child)){ Traverse(child, depth); }
-		}
 	}
 
 	void TraverseDetail(const clang::TypedefNameDecl *decl, int depth){
@@ -242,13 +233,6 @@ private:
 			Traverse(decl->getDestructor(), depth);
 		}
 	}
-	// FIXME: remove? after tests...
-	void TraverseDetail(const clang::EnumDecl *decl, int depth){
-		for(const auto child : decl->decls()) {
-			Traverse(child, depth);
-		}
-	}
-
 	void TraverseDetail(const clang::ClassTemplateSpecializationDecl *decl, int depth){
 		// specialization source class template
 		Traverse(decl->getSpecializedTemplate(), depth);
@@ -285,7 +269,6 @@ private:
                         constantArrayHack(*decl->getTypeSourceInfo(), depth);
 		}
 	}
-	// FIXME: remove? after tests...
 	void TraverseDetail(const clang::EnumConstantDecl *decl, int depth){
 		Traverse(decl->getType(), depth);
 	}

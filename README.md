@@ -155,6 +155,8 @@ In the `/tmp` directory you will then find:
 - [X] Support macro dependencies
 - [X] Comment out instead of ommitting irrelevant lines
 - [X] Support retaining relevant includes
+- [ ] Add licenses/headache for tests?
+- [ ] Use `ASTContext::getTypeInfo` to fill in missing struct fields
 - [ ] Add new tests for new functionality
 - [ ] Example for README.md
 - [ ] Update .travis.yml
