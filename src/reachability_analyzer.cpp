@@ -326,7 +326,7 @@ private:
 		if(!stmt){ return; }
 		if(!m_traversed_stmts.insert(stmt).second){ return; }
 
-		SIMP_DEBUG(debugStr(depth, "S", stmt->getStmtClassName()));
+		SIMP_DEBUG(debugStr(depth, "S", std::string(stmt->getStmtClassName()) + " " + RangeToString(stmt->getSourceRange(), *m_source_manager)));
 
 		for(const auto child : stmt->children()){
 			Traverse(child, depth + 1);
@@ -372,8 +372,8 @@ private:
 	}
 	void TraverseDetail(const clang::DesignatedInitExpr *expr, int depth){
 		for(const auto child : expr->designators()){
-			if(const auto field = child.getField()) {
-				Traverse(field, depth + 1);
+			if(child.isFieldDesignator()){
+				Traverse(child.getField(), depth + 1);
 			}
 		}
 	}
@@ -681,6 +681,7 @@ private:
 	bool MarkDetail(const clang::EnumDecl *decl, int depth){
 		MarkRange(clang::SourceRange(decl->getOuterLocStart(), EndOfHead(decl)));
 		MarkRange(decl->getBraceRange().getEnd(), decl->getEndLoc());
+		// keeping this unfiltered to preserve enum values
 		for(const auto child : decl->decls()){ MarkRecursive(child, depth); }
 		return true;
 	}
