@@ -1,0 +1,2 @@
+(test
+ (name comment_simplifier))

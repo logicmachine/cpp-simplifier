@@ -1,0 +1,4 @@
+(executable
+ (public_name comment_simplifier)
+ (name main)
+ (libraries comment_simplifier))
