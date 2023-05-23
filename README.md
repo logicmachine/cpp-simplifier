@@ -146,6 +146,12 @@ In the `/tmp` directory you will then find:
 /tmp/c-simplifier-55b854/include/uapi/asm-generic/int-ll64.h
 ```
 
+## Running Tests
+
+```
+python3 test/run_test.py ./build/c-simplifier test
+```
+
 ## To Do
 
 - [x] C constructs required for `kvm_pgtable_walk` in `pgtable.c`

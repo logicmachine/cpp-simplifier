@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 
+# ONLY FOR USE FOR THIS TEST-SUITE. Please configure your build system (or use
+# a tool like Bear) for your own project.
+
 # Helper script to generate compile_commands.json
-# Useful for running individual test outside of test harness
+# Test harness (`run_test.py`) creates compile_commands.json already.
+# This is only a helper for running individual test outside of test harness.
 
 set -euo pipefail
 
