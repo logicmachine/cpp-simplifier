@@ -103,39 +103,53 @@ public:
 	clang::SourceRange defn_range(const clang::MacroDefinition& MD) {
 		auto macro_info = MD.getMacroInfo();
 		assert (macro_info);
-		const clang::SourceRange result(macro_info->getDefinitionLoc(), macro_info->getDefinitionEndLoc());
-                // result.getEnd() is the starting point of the last macro token. For some reason
-                // (I think that because of how C handles string literals with whitespace and new
-                // lines before it, the source location for the end of macro (like the example below)
-                // ends up being 1:15 rather than 2:1, which lead to the previous wrong output,
-                // rather than the intended one. Inserting a leading space made was a simple
-                // work-around, but actually recording the (inclusive) location of the end of the
-                // last token fixes the problem.
-                //
-                // input:
-                // ```
-                // 1|#define MACRO \
-                // 2|"hi"
-                // ```
-                //
-                // intended output:
-                // ```
-                // 1|#define MACRO \
-                // 2|"hi"
-                //
-                /// previous wrong output:
-                // ```
-                // 1|#define MACRO \
-                // 2|//-"hi"
-                // ```
-                //
-                // Futhermore, it seems like the PreprocessingRecord is filled up first, before any
-                // user-defined callbacks are run. This means that adjusting the source range for
-                // macros in HandleMacroDefine is too late.
-		const auto& last_token = macro_info->getReplacementToken(macro_info->getNumTokens()-1);
-		m_range_hack[result] = clang::SourceRange(result.getBegin(),
-			last_token.getLocation().getLocWithOffset(last_token.getLength()-1));
-		return result;
+		return clang::SourceRange(macro_info->getDefinitionLoc(), macro_info->getDefinitionEndLoc());
+	}
+
+	virtual void MacroDefined(
+		const clang::Token &Id
+		, const clang::MacroDirective* MD) override
+	{
+		assert (MD);
+		auto macro_info = MD->getMacroInfo();
+		assert (macro_info);
+		auto orig = clang::SourceRange(macro_info->getDefinitionLoc(), macro_info->getDefinitionEndLoc());
+		// orig.getEnd() is the starting point of the last macro token. For some reason
+		// (I think that because of how C handles string literals with whitespace and new
+		// lines before it, the source location for the end of macro (like the example below)
+		// ends up being 1:15 rather than 2:1, which lead to the previous wrong output,
+		// rather than the intended one. Inserting a leading space made was a simple
+		// work-around, but actually recording the (inclusive) location of the end of the
+		// last token fixes the problem.
+		//
+		// input:
+		// ```
+		// 1|#define MACRO \
+		// 2|"hi"
+		// ```
+		//
+		// intended output:
+		// ```
+		// 1|#define MACRO \
+		// 2|"hi"
+		//
+		/// previous wrong output:
+		// ```
+		// 1|#define MACRO \
+		// 2|//-"hi"
+		// ```
+		//
+		// Futhermore, it seems like the PreprocessingRecord is filled up first, before any
+		// user-defined callbacks are run. This means that adjusting the source range for
+		// macros in HandleMacroDefine is too late.
+		const auto num_tokens = macro_info->getNumTokens();
+		if (num_tokens > 0) {
+			const auto& last_token = macro_info->getReplacementToken(macro_info->getNumTokens()-1);
+			m_range_hack[orig] = clang::SourceRange(orig.getBegin(),
+				last_token.getLocation().getLocWithOffset(last_token.getLength()-1));
+		} else {
+			m_range_hack[orig] = orig;
+		}
 	}
 
 	virtual void MacroExpands(
@@ -165,7 +179,11 @@ public:
 		, m_macro_deps(macro_deps)
 		, m_range_hack(range_hack)
 		, m_sm(sm)
-	{}
+	{
+		// for macros defined via the command line
+		auto invalid = clang::SourceRange();
+		m_range_hack[invalid] = invalid;
+	}
 	virtual ~PPRecordNested() { }
 };
 

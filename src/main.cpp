@@ -103,10 +103,7 @@ cl::opt<bool> omit_lines("omit-lines",
 	cl::cat(simplifier_category));
 
 static const std::regex clang13_only_flags(
-    "-Wno-psabi"
-    "|-Wno-frame-address"
     "|-Wno-unused-but-set-variable"
-    "|-Wno-pointer-to-enum-cast"
     "|-mstack-protector-guard=sysreg"
     "|-mstack-protector-guard-reg=sp_el0"
     "|-mstack-protector-guard-offset=1272"
