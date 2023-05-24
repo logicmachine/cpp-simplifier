@@ -840,8 +840,10 @@ bool actualFile(clang::SourceRange defn_range, const clang::SourceManager& sm){
 	return result;
 }
 
-void ReachabilityAnalyzer::findMacroDefns(clang::PreprocessingRecord& pr, const clang::SourceManager& sm, clang::SourceRange range,
-	const PPRecordNested::Map& macro_deps, SourceRangeSet& marked){
+void ReachabilityAnalyzer::findMacroDefns(clang::PreprocessingRecord& pr, const clang::SourceManager& sm
+	, clang::SourceRange range, const PPRecordNested::RangeToSet& macro_deps
+	, const PPRecordNested::RangeToRange& range_hack, SourceRangeSet& marked){
+
 	SIMP_DEBUG(debugStr(0, "Macro expansions in " + RangeToString(range, sm), ""));
 	const auto inRange = pr.getPreprocessedEntitiesInRange(range);
 	for (const auto* entity : inRange) {
@@ -854,7 +856,7 @@ void ReachabilityAnalyzer::findMacroDefns(clang::PreprocessingRecord& pr, const 
 
 			// Not built-in, from command line, nor already marked
 			if (actualFile(defn_range, sm) && marked.find(defn_range) == marked.end()){
-				MarkRangeDSM(2, defn_range, sm, m_marker);
+				MarkRangeDSM(2, range_hack.at(defn_range), sm, m_marker);
 				marked.emplace(defn_range);
 			}
 
@@ -866,7 +868,7 @@ void ReachabilityAnalyzer::findMacroDefns(clang::PreprocessingRecord& pr, const 
 			for (const auto& dep_range : dep_ranges->second){
 				SIMP_DEBUG(debugStr(2, "Uses " + RangeToString(dep_range, sm), ""));
 				if (marked.find(dep_range) == marked.end()) {
-					MarkRangeDSM(3, dep_range, sm, m_marker);
+					MarkRangeDSM(3, range_hack.at(dep_range), sm, m_marker);
 					marked.emplace(dep_range);
 				}
 			}
@@ -887,9 +889,10 @@ void ReachabilityAnalyzer::ExecuteAction()
 {
 	auto &ci = getCompilerInstance();
 	auto &pp = ci.getPreprocessor();
-	PPRecordNested::Map macro_deps;
+	PPRecordNested::RangeToSet macro_deps;
+	PPRecordNested::RangeToRange range_hack;
 	const auto &sm = ci.getSourceManager();
-	pp.addPPCallbacks(std::make_unique<PPRecordNested>(macro_deps, sm));
+	pp.addPPCallbacks(std::make_unique<PPRecordNested>(macro_deps, range_hack, sm));
 
 	// this runs the pre-processor and declaration traversal & marking
 	ASTFrontendAction::ExecuteAction();
@@ -903,7 +906,8 @@ void ReachabilityAnalyzer::ExecuteAction()
 
 	// mark the marcros used inside all declaration ranges
 	SourceRangeSet marked;
-	for (const auto& range : m_ranges) findMacroDefns(*pr, sm, range, macro_deps, marked);
+	for (const auto& range : m_ranges)
+		findMacroDefns(*pr, sm, range, macro_deps, range_hack, marked);
 }
 
 

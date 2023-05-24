@@ -97,7 +97,7 @@ if __name__ == '__main__':
     test_directory = os.path.abspath(test_directory)
     if test_directory[-1] != '/':
         test_directory += '/'
-    matcher = re.compile(r'^(.*)\.in\.cpp$');
+    matcher = re.compile(r'^(.*\.in\.c(pp)?)$');
     test_inputs = []
     for directory in os.walk(test_directory):
         dir_path = directory[0]
@@ -110,8 +110,8 @@ if __name__ == '__main__':
     failed_tests = []
     for filepath in test_inputs:
         test_name = filepath[len(test_directory):]
-        input_path = filepath + '.in.cpp'
-        expect_path = filepath + '.out.cpp'
+        input_path = filepath
+        expect_path = filepath.replace('.in.c', '.out.c')
         expect = ''.join([s.decode('utf-8') for s in open(expect_path, 'rb').readlines()])
         actual = run_simplify(minifier_path, input_path)
         if expect == actual:

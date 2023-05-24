@@ -93,15 +93,49 @@ using SourceRangeSet = std::unordered_set<clang::SourceRange, SourceRangeHash>;
 
 class PPRecordNested : public clang::PPCallbacks {
 public:
-	using Map = std::unordered_map<clang::SourceRange, SourceRangeSet, SourceRangeHash>;
+	using RangeToSet = std::unordered_map<clang::SourceRange, SourceRangeSet, SourceRangeHash>;
+	using RangeToRange = std::unordered_map<clang::SourceRange, clang::SourceRange, SourceRangeHash>;
 private:
-	Map& m_macro_deps;
+	RangeToSet& m_macro_deps;
+        RangeToRange& m_range_hack;
 	const clang::SourceManager &m_sm;
 public:
-        clang::SourceRange defn_range(const clang::MacroDefinition& MD) {
-		auto macro_info= MD.getMacroInfo();
+	clang::SourceRange defn_range(const clang::MacroDefinition& MD) {
+		auto macro_info = MD.getMacroInfo();
 		assert (macro_info);
-		return clang::SourceRange(macro_info->getDefinitionLoc(), macro_info->getDefinitionEndLoc());
+		const clang::SourceRange result(macro_info->getDefinitionLoc(), macro_info->getDefinitionEndLoc());
+                // result.getEnd() is the starting point of the last macro token. For some reason
+                // (I think that because of how C handles string literals with whitespace and new
+                // lines before it, the source location for the end of macro (like the example below)
+                // ends up being 1:15 rather than 2:1, which lead to the previous wrong output,
+                // rather than the intended one. Inserting a leading space made was a simple
+                // work-around, but actually recording the (inclusive) location of the end of the
+                // last token fixes the problem.
+                //
+                // input:
+                // ```
+                // 1|#define MACRO \
+                // 2|"hi"
+                // ```
+                //
+                // intended output:
+                // ```
+                // 1|#define MACRO \
+                // 2|"hi"
+                //
+                /// previous wrong output:
+                // ```
+                // 1|#define MACRO \
+                // 2|//-"hi"
+                // ```
+                //
+                // Futhermore, it seems like the PreprocessingRecord is filled up first, before any
+                // user-defined callbacks are run. This means that adjusting the source range for
+                // macros in HandleMacroDefine is too late.
+		const auto& last_token = macro_info->getReplacementToken(macro_info->getNumTokens()-1);
+		m_range_hack[result] = clang::SourceRange(result.getBegin(),
+			last_token.getLocation().getLocWithOffset(last_token.getLength()-1));
+		return result;
 	}
 
 	virtual void MacroExpands(
@@ -125,10 +159,11 @@ public:
 			m_macro_deps[outer_macro_defn_range].emplace(defn_range(MD));
 		}
 	}
-	PPRecordNested(Map& macro_deps
+	PPRecordNested(RangeToSet& macro_deps, RangeToRange& range_hack
 		, const clang::SourceManager& sm)
 		: clang::PPCallbacks()
 		, m_macro_deps(macro_deps)
+		, m_range_hack(range_hack)
 		, m_sm(sm)
 	{}
 	virtual ~PPRecordNested() { }
@@ -148,7 +183,8 @@ protected:
 		clang::PreprocessingRecord& pr,
 		const clang::SourceManager& sm,
 		clang::SourceRange range,
-		const PPRecordNested::Map& macro_deps,
+		const PPRecordNested::RangeToSet& macro_deps,
+		const PPRecordNested::RangeToRange& range_hack,
 		SourceRangeSet& marked);
 public:
 	class ASTConsumer;
