@@ -155,8 +155,7 @@ public:
 
 		m_source_cache.clear();
 		m_angled_inclusions.clear();
-		const std::string input_filename =
-			sm.getFilename(sm.getLocForStartOfFile(sm.getMainFileID()));
+		const std::string input_filename{sm.getFilename(sm.getLocForStartOfFile(sm.getMainFileID()))};
 		m_source_cache.emplace(input_filename, split_text(m_input_content));
 		m_current_source = &m_source_cache[input_filename];
 

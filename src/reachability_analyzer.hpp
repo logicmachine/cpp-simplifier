@@ -160,7 +160,7 @@ public:
 	virtual std::unique_ptr<clang::ASTConsumer> CreateASTConsumer(
 		clang::CompilerInstance &ci,
 		llvm::StringRef in_file) override;
-        
+
 };
 
 class ReachabilityAnalyzerFactory
