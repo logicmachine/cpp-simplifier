@@ -2,7 +2,7 @@
 
 #define MACRO_TEST 1
 
-#include "tmp.h"
+#include "struct_fields.h"
 
 s3 g(struct s1 s1, s4 arr[THREE])
 {
