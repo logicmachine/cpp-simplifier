@@ -142,13 +142,13 @@ public:
 		// Futhermore, it seems like the PreprocessingRecord is filled up first, before any
 		// user-defined callbacks are run. This means that adjusting the source range for
 		// macros in HandleMacroDefine is too late.
-		const auto num_tokens = macro_info->getNumTokens();
-		if (num_tokens > 0) {
+		if (const auto num_tokens = macro_info->getNumTokens(); num_tokens > 0) {
 			const auto& last_token = macro_info->getReplacementToken(macro_info->getNumTokens()-1);
 			m_range_hack[orig] = clang::SourceRange(orig.getBegin(),
 				last_token.getLocation().getLocWithOffset(last_token.getLength()-1));
 		} else {
-			m_range_hack[orig] = orig;
+			m_range_hack[orig] = clang::SourceRange(orig.getBegin(),
+				orig.getBegin().getLocWithOffset(Id.getLength()-1));
 		}
 	}
 
