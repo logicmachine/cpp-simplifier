@@ -94,9 +94,6 @@ cl::opt<bool, true> debugOpt("d",
 	cl::desc("Enable debug output on stderr"),
 	cl::location(debugOn),
 	cl::cat(simplifier_category));
-cl::opt<bool> omit_lines("omit-lines",
-	cl::desc("Omit lines instead of commenting them out"),
-	cl::cat(simplifier_category));
 
 static const std::regex clang13_only_flags(
     "|-Wno-unused-but-set-variable"
@@ -133,7 +130,7 @@ int main(int argc, const char *argv[]){
 	tool.appendArgumentsAdjuster(remove_clang13_only_flags);
 
 	const std::unordered_set<std::string> rootSet(roots.begin(), roots.end());
-	const auto result = simplify(tool, filename, rootSet, omit_lines);
+	const auto result = simplify(tool, filename, rootSet);
 
 	std::cout << result.string();
 	return 0;

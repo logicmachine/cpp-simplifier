@@ -107,8 +107,7 @@ fs::path gen_tmp_dir(){
 fs::path simplify(
 	tl::ClangTool &tool,
 	const std::string &input_filename,
-	const std::unordered_set<std::string> &roots,
-	const bool omit_lines)
+	const std::unordered_set<std::string> &roots)
 {
 	auto marker = std::make_shared<ReachabilityMarker>();
 	ReachabilityAnalyzerFactory analyzer_factory(marker, roots);
@@ -127,15 +126,8 @@ fs::path simplify(
 		std::string line;
 		for(unsigned int i = 0; std::getline(iss, line); ++i){
 			const auto marked_i = i < marked.size() && marked[i];
-			// TODO - tidy this nonsense up
-			if (omit_lines) {
-				if(marked_i){
-					ofs << line << std::endl;
-				}
-			} else {
-				if(!marked_i) ofs << "//-";
-				ofs << line << std::endl;
-			}
+			if(!marked_i) ofs << "//-";
+			ofs << line << std::endl;
 		}
 	}
 
