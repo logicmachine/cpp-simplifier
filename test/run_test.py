@@ -67,7 +67,7 @@
 #  SOFTWARE.                                                                       #
 ####################################################################################
 
-import os, sys, re, subprocess, json;
+import os, sys, re, subprocess, json, difflib;
 import clang.cindex
 
 def print_success(name):
@@ -102,7 +102,7 @@ if __name__ == '__main__':
     for directory in os.walk(test_directory):
         dir_path = directory[0]
         for filename in directory[2]:
-            filepath = os.path.abspath(dir_path + '/' + filename)
+            filepath = os.path.join(dir_path, filename)
             match = matcher.match(filepath)
             if match is not None:
                 test_inputs.append(match.group(1))
@@ -112,13 +112,16 @@ if __name__ == '__main__':
         test_name = filepath[len(test_directory):]
         input_path = filepath
         expect_path = filepath.replace('.in.c', '.out.c')
-        expect = ''.join([s.decode('utf-8') for s in open(expect_path, 'rb').readlines()])
-        actual = run_simplify(minifier_path, input_path)
+        expect = open(expect_path, 'r').readlines()
+        out_dir = run_simplify(minifier_path, input_path)
+        actual_path = os.path.join(out_dir,sys.argv[2],test_name)
+        actual = open(actual_path, 'r').readlines()
         if expect == actual:
             print_success(test_name)
             passed_tests.append(test_name)
         else:
             print_failed(test_name)
+            sys.stdout.writelines(difflib.unified_diff(expect, actual, expect_path, actual_path))
             failed_tests.append(test_name)
     if len(failed_tests) == 0:
         print_success('%d tests.' % len(passed_tests))

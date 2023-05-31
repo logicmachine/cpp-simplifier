@@ -1,7 +1,7 @@
-#define EMPTY \
+#define EMPTY(x,y) \
 int main()
 {
     int x[] = { 0 };
-    EMPTY;
+    EMPTY(0,0);
     return x[0];
 }

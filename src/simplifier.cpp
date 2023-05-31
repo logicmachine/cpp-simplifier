@@ -67,7 +67,6 @@
 /*  SOFTWARE.                                                                       */
 /************************************************************************************/
 
-#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -105,7 +104,7 @@ fs::path gen_tmp_dir(){
 	return fs::exists(result) ? gen_tmp_dir() : result;
 }
 
-std::string simplify(
+fs::path simplify(
 	tl::ClangTool &tool,
 	const std::string &input_filename,
 	const std::unordered_set<std::string> &roots,
@@ -117,14 +116,11 @@ std::string simplify(
 		throw std::runtime_error("compilation error");
 	}
 
-	std::ostringstream oss;
-	const auto tmp_dir = gen_tmp_dir();
-	SIMP_DEBUG(std::cerr << "Tmp dir: " << tmp_dir << std::endl);
+	const auto result = gen_tmp_dir();
 	for (const auto& it : *marker){
 		const auto& filename = it.first;
-		const auto also_oss = input_filename.find(filename) != std::string::npos;
 		SIMP_DEBUG(std::cerr << "Outputting: " << filename << std::endl);
-		auto ofs = create(tmp_dir, fs::path(filename));
+		auto ofs = create(result, fs::path(filename));
 		const auto& marked = it.second;
 		// open file and iterate line by line
 		std::ifstream iss(filename);
@@ -135,16 +131,14 @@ std::string simplify(
 			if (omit_lines) {
 				if(marked_i){
 					ofs << line << std::endl;
-					if (also_oss) oss << line << std::endl;
 				}
 			} else {
-				if(!marked_i) { ofs << "//-"; if (also_oss) oss << "//-"; }
+				if(!marked_i) ofs << "//-";
 				ofs << line << std::endl;
-				if (also_oss) oss << line << std::endl;
 			}
 		}
 	}
 
-	return oss.str();
+	return result;
 }
 

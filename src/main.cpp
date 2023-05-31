@@ -85,10 +85,6 @@ namespace tl = clang::tooling;
 
 cl::OptionCategory simplifier_category("c-simplifier options");
 cl::extrahelp common_help(tl::CommonOptionsParser::HelpMessage);
-cl::opt<std::string> output_filename("o",
-	cl::desc("Specify output filename"),
-	cl::value_desc("filename"),
-	cl::cat(simplifier_category));
 cl::list<std::string> roots("r",
 	cl::desc("Specify root function"),
 	cl::value_desc("func"),
@@ -139,12 +135,7 @@ int main(int argc, const char *argv[]){
 	const std::unordered_set<std::string> rootSet(roots.begin(), roots.end());
 	const auto result = simplify(tool, filename, rootSet, omit_lines);
 
-	if(!output_filename.empty()){
-		std::ofstream ofs(output_filename.c_str());
-		ofs << result;
-	}else{
-		std::cout << result;
-	}
+	std::cout << result.string();
 	return 0;
 }
 
