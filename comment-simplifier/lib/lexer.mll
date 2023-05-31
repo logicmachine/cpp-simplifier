@@ -7,85 +7,126 @@ exception Eof_in_comment
 ;;
 
 (* TODO add location *)
-exception Only_one_line_block_comment
+exception Ignored_line_in_kept_block_comment
 ;;
 
 (* TODO add location information *)
-exception No_code_after_end_of_block_comment
+exception No_code_after_multi_line_block_comment
 ;;
+
+let rev_char_list str =
+  let seq = String.to_seq str in
+  Seq.fold_left (fun y x -> List.cons x y) [] seq
+;;
+
+let newline (cont : _ -> lexbuf -> 'a) ~(write : char -> unit) (lexbuf : lexbuf) : 'a =
+  write (lexeme_char lexbuf 0);
+  new_line lexbuf;
+  cont write lexbuf
+;;
+
+let esc_newline cont ~write lexbuf =
+  String.iter write "\\\n";
+  new_line lexbuf;
+  cont write lexbuf
+;;
+
 }
 
-let ws = ' ' | '\t'
+let space_tab = ' ' | '\t'
+let ws = space_tab | '\\' space_tab
+let esc_nl = '\\' '\n'
+let ignor = "//-"
 
-(* start of a line, may or may not be included *)
+(* rtart of a line, may or may not be kept *)
 rule line_start write = parse
-  | "//-" { ignored_line [] write lexbuf }
+  | ignor { ignored_line [] write lexbuf }
   | eof   { () }
   | _     { write (lexeme_char lexbuf 0);
-            included_line write lexbuf }
+            kept_line write lexbuf }
 
-(* line included so cannot run-over with block-comment *)
-(* TODO what about \ at the end of a line? aargh *)
-and included_line write = parse
-  | eof   { () }
-  | '\n'  { write '\n'; new_line lexbuf;
-            line_start write lexbuf }
-  | "/*"  { String.iter write "/*";
-            one_line_block_comment write lexbuf;
-            included_line write lexbuf }
-  | _     { write (lexeme_char lexbuf 0);
-            included_line write lexbuf }
+(* line kept so cannot run-over with block-comment *)
+and kept_line write = parse
+  | eof    { () }
+  | esc_nl { esc_newline kept_line ~write lexbuf }
+  | '\n'   { newline line_start ~write lexbuf }
+  | "//"   { String.iter write (lexeme lexbuf);
+             commented_line write lexbuf }
+  | "/*"   { String.iter write (lexeme lexbuf);
+             kept_block_comment write lexbuf;
+             kept_line write lexbuf }
+  | _      { write (lexeme_char lexbuf 0);
+             kept_line write lexbuf }
 
-and one_line_block_comment write = parse
-  | eof  { raise Eof_in_comment }
-  | '\n' { raise Only_one_line_block_comment }
-  | "*/" { String.iter write "*/" }
-  | _    { write (lexeme_char lexbuf 0);
-           one_line_block_comment write lexbuf }
+and kept_block_comment write = parse
+  | eof        { raise Eof_in_comment }
+  | '\n' ignor
+  | '\n'       { newline kept_block_comment ~write lexbuf }
+  | "*/"       { String.iter write (lexeme lexbuf) }
+  | _          { write (lexeme_char lexbuf 0);
+                 kept_block_comment write lexbuf }
 
-(* assume: - in ignored line, "//-" NOT written,
-   only `spaces' or `comments' so far *)
-and ignored_line spaces write = parse
-  | ws   { ignored_line ((lexeme_char lexbuf 0) :: spaces) write lexbuf }
-  | "/*" { List.iter write (List.rev spaces);
-           String.iter write "/*";
-           ignored_block_comment write lexbuf }
-  | "//" { List.iter write (List.rev spaces);
-           String.iter write "//";
+(* assume: - in ignored line,"//-" not written, `buf' seen so far *)
+and ignored_line buf write = parse
+  | ws   { ignored_line (rev_char_list (lexeme lexbuf) @ buf) write lexbuf }
+  | esc_nl ignor
+  | esc_nl { String.iter write "//-";
+             List.iter write (List.rev buf);
+             esc_newline commented_line ~write lexbuf }
+  | '\n' { List.iter write (List.rev buf);
+           newline line_start ~write lexbuf }
+  | "/*" { let buf = rev_char_list (lexeme lexbuf) @ buf in
+           let (n, buf) = ignored_block_comment (1,buf) lexbuf in
+           if n = 1  then
+             ignored_line buf write lexbuf
+           else (
+             List.iter write (List.rev buf);
+             empty_line write lexbuf
+           )
+         }
+  | "//" { List.iter write (List.rev buf);
+           String.iter write (lexeme lexbuf);
            commented_line write lexbuf }
   | _    { String.iter write "//-";
-           List.iter write (List.rev spaces);
+           List.iter write (List.rev buf);
            write (lexeme_char lexbuf 0);
            commented_line write lexbuf }
 
 (* rest of line is line-commented out *)
 and commented_line write = parse
-  | eof   { () }
-  | '\n'  { write '\n'; new_line lexbuf;
-            line_start write lexbuf }
-  | _     { write (lexeme_char lexbuf 0);
-            commented_line write lexbuf }
+  | eof    { () }
+  | esc_nl ignor
+  | esc_nl { esc_newline commented_line ~write lexbuf }
+  | '\n'   { newline line_start ~write lexbuf }
+  | _      { write (lexeme_char lexbuf 0);
+             commented_line write lexbuf }
 
 (* in a block comment, with //- delete-able *)
-and ignored_block_comment write = parse
-  | eof   { raise Eof_in_comment }
-  | '\n'  { write '\n'; new_line lexbuf;
-            ignored_block_comment write lexbuf }
-  | "*/"  { String.iter write "*/";
-            empty_line write lexbuf }
-  | "//-" { ignored_block_comment write lexbuf }
-  | _     { write (lexeme_char lexbuf 0);
-            ignored_block_comment write lexbuf }
+and ignored_block_comment lines_buf = parse
+  | eof    { raise Eof_in_comment }
+  (* weird, yes, but \ removal takes place _before_ comment recognition *)
+  | esc_nl ignor
+  | esc_nl { let (lines, buf) = lines_buf in
+             ignored_block_comment (lines, rev_char_list "\\\n" @ buf) lexbuf }
+  | '\n'   { let (lines, buf) = lines_buf in
+             newline
+              (Fun.const (ignored_block_comment (lines+1, (lexeme_char lexbuf 0) :: buf)))
+              ~write:(fun _ -> ()) lexbuf }
+  | "*/"   { let (lines, buf) = lines_buf in (lines, (rev_char_list (lexeme lexbuf) @ buf)) }
+  | ignor  { ignored_block_comment lines_buf lexbuf }
+  | _      { let (lines, buf) = lines_buf in
+             let buf = (lexeme_char lexbuf 0) :: buf in
+             ignored_block_comment (lines, buf) lexbuf }
 
-(* line is included, but must be empty *)
+(* line is kept, but must be empty *)
 and empty_line write = parse
-  | eof  { () }
-  | '\n' { write '\n'; new_line lexbuf;
-           line_start write lexbuf }
-  | "/*" { String.iter write "/*";
-           one_line_block_comment write lexbuf;
-           empty_line write lexbuf }
-  | ws    { write (lexeme_char lexbuf 0);
-            empty_line write lexbuf }
-  | _     { raise No_code_after_end_of_block_comment }
+  | eof    { () }
+  | esc_nl { esc_newline empty_line ~write lexbuf }
+  | '\n'   { newline line_start ~write lexbuf }
+  | "/*"   { String.iter write (lexeme lexbuf);
+             kept_block_comment write lexbuf;
+             empty_line write lexbuf }
+  | ws     { String.iter write (lexeme lexbuf);
+             empty_line write lexbuf }
+  | _      { (* maybe make this a warning? *) raise No_code_after_multi_line_block_comment }
 
