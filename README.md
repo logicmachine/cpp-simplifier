@@ -149,8 +149,11 @@ In the `/tmp` directory you will then find:
 ## Running Tests
 
 ```
-python3 test/run_test.py ./build/c-simplifier test
+./test/run_test.py make && ./test/run_test.py for
 ```
+
+This makes a `compile_commands.json` file for all the test inputs and then runs
+all the tests. Additional options in `./test/run_test.py -h`.
 
 ## To Do
 
