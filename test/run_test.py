@@ -73,7 +73,14 @@ import os, sys, re, subprocess, json, difflib, argparse
 show_actual = False
 test_matcher = re.compile(r'^(.*\.in\.c(pp)?)$')
 
+def eprint(*args, then_exit=True, **kwargs):
+    print('Error:', *args, file=sys.stderr, **kwargs)
+    if then_exit:
+        exit(1)
+
 def test_files(test_dir):
+    if not os.path.isdir(test_dir):
+        eprint(f"'{test_dir}' not a directory")
     for root, _, files in os.walk(test_dir):
         for filename in files:
             if test_matcher.match(filename) is not None:
@@ -96,7 +103,7 @@ class Simplifier:
     def __init__(self, simplifier):
         self.simplifier = simplifier
         if not os.path.isfile('compile_commands.json'):
-            eprint("Run './test/run_test.py make' first")
+            eprint("run './test/run_test.py make' first")
 
     def run(self, input_rel_path):
         cwd = os.getcwd()
@@ -111,33 +118,28 @@ class Simplifier:
             return { 'content' : actual.readlines(), 'path': actual_path }
 
 def get_diff(simplifier, input_rel_path):
+    actual = simplifier.output(input_rel_path)
     expect_path = input_rel_path.replace('.in.c', '.out.c')
     with open(expect_path, 'r') as expect:
-        actual = simplifier.output(input_rel_path)
         return list(difflib.unified_diff(expect.readlines(), actual['content'], expect_path,
             expect_path if not show_actual else actual['path']))
 
-def eprint(*args, then_exit=True, **kwargs):
-    print(*args, file=sys.stderr, **kwargs)
-    if then_exit:
-        exit(1)
-
-def filter_inputs(args):
-    inputs = test_files(args.test_dir)
-    if args.suffix is not None:
-        inputs = list(filter(lambda x : x.endswith(args.suffix), inputs))
+def filter_inputs(test_dir, suffix):
+    inputs = test_files(test_dir)
+    if suffix is not None:
+        inputs = list(filter(lambda x : x.endswith(suffix), inputs))
         inputs_len = len(inputs)
         if inputs_len > 1:
-            eprint(f'More than one file matching *{args.suffix} found in {args.test_dir}', then_exit=False)
+            eprint(f'more than one file matching *{suffix} found in {test_dir}', then_exit=False)
             eprint(inputs)
         elif inputs_len == 0:
-            eprint(f'*{args.suffix} not found in {args.test_dir}')
+            eprint(f'*{suffix} not found in {test_dir}')
     return inputs
 
-def dir_or_file(args):
+def run_tests(args):
     failed_tests = 0
     simplifier = Simplifier(args.simplifier)
-    for input_rel_path in filter_inputs(args):
+    for input_rel_path in filter_inputs(args.test_dir, args.suffix):
         diff = get_diff(simplifier, input_rel_path)
         if args.patch:
             if diff:
@@ -172,7 +174,7 @@ parser_for.add_argument('--suffix',
         help='Uniquely identifying suffix of a file in compile_commands.json')
 parser_for.add_argument('--patch', help='Output unified format patches for the failing tests.',
         action='store_true')
-parser_for.set_defaults(func=dir_or_file)
+parser_for.set_defaults(func=run_tests)
 
 # parse args and call func (as set using set_defaults)
 args = parser.parse_args()
