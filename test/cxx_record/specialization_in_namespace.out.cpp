@@ -6,6 +6,8 @@ namespace a {
 	struct A<int> {
 	};
 }
+//-struct B {
+//-};
 int main(){
 	a::A<int> x;
 	return 0;

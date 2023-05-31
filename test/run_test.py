@@ -70,6 +70,7 @@
 
 import os, sys, re, subprocess, json, difflib, argparse
 
+show_actual = False
 test_matcher = re.compile(r'^(.*\.in\.c(pp)?)$')
 
 def test_files(test_dir):
@@ -99,7 +100,7 @@ class Simplifier:
 
     def run(self, input_rel_path):
         cwd = os.getcwd()
-        proc = subprocess.Popen([self.simplifier, "--omit-lines", input_rel_path], stdout=subprocess.PIPE)
+        proc = subprocess.Popen([self.simplifier, input_rel_path], stdout=subprocess.PIPE)
         result = proc.communicate()[0].decode('utf-8')
         return result
 
@@ -107,13 +108,14 @@ class Simplifier:
         out_dir = self.run(input_rel_path)
         actual_path = os.path.join(out_dir, input_rel_path)
         with open(actual_path, 'r') as actual:
-            return (actual.readlines(), actual_path)
+            return { 'content' : actual.readlines(), 'path': actual_path }
 
 def get_diff(simplifier, input_rel_path):
     expect_path = input_rel_path.replace('.in.c', '.out.c')
     with open(expect_path, 'r') as expect:
-        actual, actual_path = simplifier.output(input_rel_path)
-        return list(difflib.unified_diff(expect.readlines(), actual, expect_path, actual_path))
+        actual = simplifier.output(input_rel_path)
+        return list(difflib.unified_diff(expect.readlines(), actual['content'], expect_path,
+            expect_path if not show_actual else actual['path']))
 
 def eprint(*args, then_exit=True, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
@@ -136,10 +138,15 @@ def dir_or_file(args):
     failed_tests = 0
     simplifier = Simplifier(args.simplifier)
     for input_rel_path in filter_inputs(args):
-        if (diff := get_diff(simplifier, input_rel_path)):
+        diff = get_diff(simplifier, input_rel_path)
+        if args.patch:
+            if diff:
+                failed_tests += 1
+                sys.stdout.writelines(diff)
+        elif diff:
             failed_tests += 1
-            sys.stdout.writelines(diff)
-        elif not args.quiet:
+            print('\033[31m[ FAILED ]\033[m %s' % input_rel_path)
+        else:
             print('\033[32m[ PASSED ]\033[m %s' % input_rel_path)
     sys.exit(min(failed_tests, 1))
     return
@@ -163,7 +170,8 @@ parser_for = subparsers.add_parser('for',
 parser_for.add_argument('--simplifier', default='./build/c-simplifier')
 parser_for.add_argument('--suffix',
         help='Uniquely identifying suffix of a file in compile_commands.json')
-parser_for.add_argument('-q', '--quiet', help='Do not print when tests pass.', action='store_true')
+parser_for.add_argument('--patch', help='Output unified format patches for the failing tests.',
+        action='store_true')
 parser_for.set_defaults(func=dir_or_file)
 
 # parse args and call func (as set using set_defaults)

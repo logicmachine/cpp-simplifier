@@ -2,6 +2,9 @@ struct A {
 	struct B {
 		int b;
 	};
+//-	struct C {
+//-		int c;
+//-	};
 	B b;
 };
 int main(){

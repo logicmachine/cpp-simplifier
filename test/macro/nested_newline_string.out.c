@@ -1,6 +1,8 @@
 #define MACRO \
 "hello"
+//-
 #define NESTED MACRO
+//-
 int main()
 {
     char *x = NESTED;

@@ -1,12 +1,12 @@
 auto
 foo()
--> int 
+-> int
 {
 	return 0;
 }
 auto
 bar()
--> int 
+-> int
 {
 	return 0;
 }

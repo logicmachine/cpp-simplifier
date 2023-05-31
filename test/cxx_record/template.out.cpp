@@ -3,6 +3,7 @@ struct A {
 	void a(){ }
 	void b(){ }
 	void c(){ }
+//-	void d(){ }
 };
 int main(){
 	A<int> a_int;

@@ -1,6 +1,10 @@
 struct A {
 	int a;
 	int b;
+//-	A()
+//-		: a(10)
+//-		, b(20)
+//-	{ }
 	A(int a, int b)
 		: a(a)
 		, b(b)

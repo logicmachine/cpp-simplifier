@@ -1,5 +1,6 @@
 #define MACRO \
 "hello"
+//-
 int main()
 {
     char *x = MACRO;
