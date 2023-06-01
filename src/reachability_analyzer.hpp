@@ -97,7 +97,7 @@ public:
 	using RangeToRange = std::unordered_map<clang::SourceRange, clang::SourceRange, SourceRangeHash>;
 private:
 	RangeToSet& m_macro_deps;
-        RangeToRange& m_range_hack;
+	RangeToRange& m_range_hack;
 	const clang::SourceManager &m_sm;
 public:
 	clang::SourceRange defn_range(const clang::MacroDefinition& MD) {

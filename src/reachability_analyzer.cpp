@@ -76,26 +76,23 @@
 #include <clang/AST/ExprCXX.h>
 #include "reachability_analyzer.hpp"
 
+// getPresumedLoc has an optional boolean UseLineDirectives
+// should be useful if we ever want to handle preprocessed files
 std::string RangeToString(clang::SourceRange range, const clang::SourceManager& sm){
 	const auto begin = sm.getPresumedLoc(range.getBegin());
 	const auto end = sm.getPresumedLoc(range.getEnd());
 	if (!begin.isValid() || !end.isValid()) { return std::string("invalid"); }
-	const auto same_files = begin.getFileID() == end.getFileID();
+	assert(begin.getFileID() == end.getFileID());
 	std::ostringstream result;
-	if (same_files)
-		result << begin.getFilename() << ", " << begin.getLine() << ':' << begin.getColumn() << " - "
-			<< end.getLine() << ':' << end.getColumn();
-	else
-		result << begin.getFilename() << ':' << begin.getLine() << ':' << begin.getColumn() << " - "
-			<< end.getFilename() << ':' << end.getLine() << ':' << end.getColumn();
+	result << begin.getFilename() << ", " << begin.getLine() << ':' << begin.getColumn() << " - "
+		<< end.getLine() << ':' << end.getColumn();
 	return result.str();
 }
 
 void debugDecl(int depth, char type, const clang::Decl* decl, const clang::SourceManager& sm){
 	std::cerr << std::string(depth * 2, ' ')
 	          << type << ": " << decl->getDeclKindName();
-	if(clang::isa<clang::NamedDecl>(decl)){
-		const auto named_decl = clang::dyn_cast<clang::NamedDecl>(decl);
+	if(const auto named_decl = clang::dyn_cast<clang::NamedDecl>(decl)){
 		const auto name = named_decl->getNameAsString();
 		std::cerr << " (" << name << ") at ";
 	}
@@ -266,7 +263,7 @@ private:
 		}
 		// fixed-size array members can refer to other expressions for their length
 		if(decl->getTypeSourceInfo()){
-                        constantArrayHack(*decl->getTypeSourceInfo(), depth);
+			constantArrayHack(*decl->getTypeSourceInfo(), depth);
 		}
 	}
 	void TraverseDetail(const clang::EnumConstantDecl *decl, int depth){
@@ -305,7 +302,7 @@ private:
 	}
 	void constantArrayHack(const clang::TypeSourceInfo& typeSourceInfo, int depth){
 		const auto& type = typeSourceInfo.getType();
-		if (clang::isa<clang::ConstantArrayType>(type.getTypePtrOrNull())){
+		if (clang::isa<clang::ConstantArrayType>(type.getTypePtr())){
 			Traverse(typeSourceInfo.getTypeLoc(), depth);
 		} else {
 			Traverse(type, depth);
@@ -420,7 +417,7 @@ private:
 	// Types
 	//------------------------------------------------------------------------
 	void Traverse(const clang::QualType &type, int depth){
-		Traverse(type.getTypePtrOrNull(), depth);
+		Traverse(type.getTypePtr(), depth);
 	}
 	void Traverse(const clang::Type *type, int depth){
 		if(!type){ return; }
@@ -611,8 +608,8 @@ private:
 		if(m_traversed_decls.find(decl) == m_traversed_decls.end()){
 			return false;
 		}
-                return MarkRecursive(decl, depth);
-        }
+		return MarkRecursive(decl, depth);
+	}
 	bool MarkRecursive(const clang::Decl *decl, int depth){
 
 		SIMP_DEBUG(debug(depth, 'M', decl));
@@ -624,8 +621,7 @@ private:
 		result |= TestAndMark<clang::UsingDirectiveDecl>(decl, depth);
 		result |= TestAndMark<clang::NamespaceDecl>(decl, depth);
 
-		result |= TestAndMark<clang::TypedefDecl>(decl, depth);
-		result |= TestAndMark<clang::TypeAliasDecl>(decl, depth);
+		result |= TestAndMark<clang::TypedefNameDecl>(decl, depth);
 		result |= TestAndMark<clang::TypeAliasTemplateDecl>(decl, depth);
 		result |= TestAndMark<clang::RecordDecl>(decl, depth);
 		result |= TestAndMark<clang::EnumDecl>(decl, depth);
@@ -660,11 +656,7 @@ private:
 		return result;
 	}
 
-	bool MarkDetail(const clang::TypedefDecl *decl, int){
-		MarkRange(decl->getBeginLoc(), decl->getEndLoc());
-		return true;
-	}
-	bool MarkDetail(const clang::TypeAliasDecl *decl, int){
+	bool MarkDetail(const clang::TypedefNameDecl *decl, int){
 		MarkRange(decl->getBeginLoc(), decl->getEndLoc());
 		return true;
 	}
@@ -748,12 +740,14 @@ public:
 		, m_ranges(ranges)
 	{ }
 
-	std::unordered_set<const clang::FunctionDecl*> getFuncRoots(const clang::TranslationUnitDecl* tu, const clang::IdentifierTable& idents){
+	std::unordered_set<const clang::FunctionDecl*> getFuncRoots(
+		const clang::TranslationUnitDecl* tu,
+		const clang::IdentifierTable& idents){
 		std::unordered_set<const clang::FunctionDecl*> result;
 		for(const auto root : m_roots){
 			bool inserted = false;
-			const auto maybeFound = idents.find(root);
-			if (maybeFound != idents.end()) {
+			if (const auto maybeFound = idents.find(root);
+				maybeFound != idents.end()) {
 				const auto lookupResult = tu->lookup(clang::DeclarationName(maybeFound->getValue()));
 				for (const auto named_decl : lookupResult){
 					if(const auto func_decl = named_decl->getAsFunction()){
@@ -772,13 +766,120 @@ public:
 		return result;
 	}
 
+	bool IsBefore(const clang::Decl* prev, const clang::Decl* curr){
+		const auto lhs = m_source_manager->getPresumedLoc(prev->getEndLoc());
+		const auto rhs = m_source_manager->getPresumedLoc(curr->getBeginLoc());
+
+		// only care about declarations from a source file
+		// that too the same source file
+		if (lhs.isInvalid()
+			|| rhs.isInvalid()
+			|| lhs.getFileID() != rhs.getFileID())
+			return true;
+
+		// easy case
+		if  (lhs.getLine() < rhs.getLine())
+			return true;
+
+		// declaration inside a macro
+		const auto prev_begin = m_source_manager->getPresumedLoc(prev->getBeginLoc());
+		const auto prev_end = lhs;
+		const auto curr_begin = rhs;
+		const auto curr_end = m_source_manager->getPresumedLoc(curr->getEndLoc());
+		const auto eq = [](const clang::PresumedLoc& a, const clang::PresumedLoc& b){
+			return a.getLine() == b.getLine() && a.getColumn() == b.getColumn();
+		};
+		if (prev->getBeginLoc().isMacroID()
+			&& curr->getBeginLoc().isMacroID()
+			&& eq(prev_begin, prev_end)
+			&& eq(prev_end, curr_begin)
+			&& eq(curr_begin, curr_end))
+				return true;
+
+		// typedef on struct definition
+		if (clang::dyn_cast<clang::RecordDecl>(prev)
+			&& clang::isa<clang::TypedefNameDecl>(curr)
+			&& curr->getSourceRange().fullyContains(prev->getSourceRange())){
+				return true;
+		}
+
+		if (clang::isa<clang::EmptyDecl>(curr)){
+			return true;
+		}
+
+		if (const auto func = clang::dyn_cast<clang::FunctionDecl>(curr)){
+			if (0 != func->getBuiltinID()){
+				return true;
+			}
+		}
+
+		// extern {struct tag, enum} var(args);
+		if ((clang::isa<clang::RecordDecl>(prev) || clang::isa<clang::EnumDecl>(prev))
+			&& (clang::isa<clang::VarDecl>(curr) || clang::isa<clang::FunctionDecl>(curr))
+			&& curr->getSourceRange().fullyContains(prev->getSourceRange())){
+			return true;
+		}
+
+		// multiple vars in one-line declarator: `T a, b;`
+		if (clang::isa<clang::VarDecl>(curr)
+			&& clang::isa<clang::VarDecl>(prev)
+			&& prev_begin.getLine() == prev_end.getLine()
+			&& prev_end.getLine() == curr_begin.getLine()
+			&& curr_begin.getLine() == curr_end.getLine()){
+				return true;
+		}
+
+		return false;
+	}
+
+	bool ToplevelOnDiffLines(const clang::TranslationUnitDecl* tu,
+		clang::DiagnosticsEngine& diagnostics, const unsigned not_after_id){
+		auto it = tu->decls_begin();
+		const auto end = tu->decls_end();
+		const auto name_of = [](auto* decl){
+			if(const auto named_decl = clang::dyn_cast<clang::NamedDecl>(decl)){
+				return named_decl->getNameAsString();
+			}else{
+				return std::string();
+			}
+		};
+		
+                auto result = true;
+
+		// empty case
+		if(it == end) return result;
+		
+		// non-empty case
+		auto prev = *it;
+		while (++it != end){
+			const auto curr = *it;
+			if(!IsBefore(prev, curr)) {
+				result = false;
+				diagnostics.Report(curr->getBeginLoc(), not_after_id)
+					<< name_of(prev)
+					<< name_of(curr);
+			}
+			prev = curr;
+		}
+
+
+		return result;
+	}
+
 	virtual void HandleTranslationUnit(clang::ASTContext &context) override {
 		const auto &sm = context.getSourceManager();
 		const auto tu = context.getTranslationUnitDecl();
+		auto& diagnostics = context.getDiagnostics();
+		const auto not_after_id = diagnostics.getCustomDiagID(
+			clang::DiagnosticsEngine::Error,
+			"declaration '%1' must start on a line after the end of declaration '%0'");
 
-		SIMP_DEBUG(tu->dump());
+		//SIMP_DEBUG(tu->dump());
 		m_source_manager = &sm;
 		reset();
+
+		if(!ToplevelOnDiffLines(tu, diagnostics, not_after_id))
+			return;
 
 		if (!m_roots.empty()){
 			const auto funcRoots = getFuncRoots(tu, context.Idents);
@@ -828,7 +929,7 @@ std::unique_ptr<clang::ASTConsumer> ReachabilityAnalyzer::CreateASTConsumer(
 	clang::CompilerInstance &ci,
 	llvm::StringRef in_file)
 {
-	return std::make_unique<ASTConsumer>(m_marker, m_roots, m_ranges);
+	return std::make_unique<ReachabilityAnalyzer::ASTConsumer>(m_marker, m_roots, m_ranges);
 }
 
 bool actualFile(clang::SourceRange defn_range, const clang::SourceManager& sm){
