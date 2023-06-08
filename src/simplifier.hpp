@@ -71,12 +71,12 @@
 #define CPP_SIMPLIFIER_SIMPLIFIER_HPP
 
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <unordered_set>
 
-std::filesystem::path simplify(
+std::optional<std::filesystem::path> simplify(
 	clang::tooling::ClangTool &tool,
-	const std::string &input_filname,
 	const std::unordered_set<std::string> &roots);
 
 #endif

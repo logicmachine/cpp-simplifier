@@ -77,13 +77,31 @@
 #include <clang/Tooling/CommonOptionsParser.h>
 #include <clang/Tooling/Tooling.h>
 #include <llvm/Support/CommandLine.h>
-#include "inclusion_unroller.hpp"
 #include "simplifier.hpp"
 
+namespace fs = std::filesystem;
 namespace cl = llvm::cl;
 namespace tl = clang::tooling;
 
 cl::OptionCategory simplifier_category("c-simplifier options");
+
+struct UnsignedOptParser : public cl::parser<std::optional<unsigned>> {
+	UnsignedOptParser(cl::Option& o) : cl::parser<std::optional<unsigned>>(o) {};
+
+	bool parse(cl::Option& o, llvm::StringRef arg_name, llvm::StringRef &arg, std::optional<unsigned>& val) {
+		cl::parser<unsigned> tmp(o);
+		unsigned out;
+		const auto try_parse = tmp.parse(o, arg_name, arg, out);
+		if (!try_parse) val = out;
+		return try_parse;
+	}
+};
+
+cl::opt<std::optional<unsigned>, false, UnsignedOptParser> commandOpt("n",
+        cl::desc("For multiple commands, choose one of them"),
+        cl::init(std::optional<unsigned>()),
+        cl::cat(simplifier_category));
+
 cl::extrahelp common_help(tl::CommonOptionsParser::HelpMessage);
 cl::list<std::string> roots("r",
 	cl::desc("Specify root function"),
@@ -114,25 +132,78 @@ static tl::CommandLineArguments remove_clang13_only_flags(
 	return result;
 }
 
+
+std::optional<tl::CompileCommand> check_and_get_command(const std::string& filename,
+	const tl::CompilationDatabase& compile_db){
+
+	const auto abs_path = fs::absolute(fs::path(filename));
+	const auto commands = compile_db.getCompileCommands(abs_path.string());
+
+	if (commands.empty()) {
+		std::cerr << "error: file not found in compilation database" << std::endl;
+		return {};
+	}
+
+	if (!commandOpt){
+		if (commands.size() > 1){
+			std::cerr << "error: more than one command in database" << std::endl;
+			std::cerr << "specify which one you want using -n" << std::endl << std::endl;
+			for (int i = 0; i < commands.size(); i++) {
+				std::cerr << i << ':';
+				for (const auto& arg: commands[i].CommandLine) std::cerr << ' ' << arg;
+				std::cerr << std::endl << std::endl;
+			}
+			return {};
+		}
+		/* commands.size() == 1 */
+		commandOpt = 0;
+	}
+
+	/* commandOpt.has_value() */
+	if (!(0 <= *commandOpt && *commandOpt < commands.size())){
+	        std::cerr << "error: -n " << *commandOpt << " out of bounds [0-" << commands.size() - 1 << "]" << std::endl;
+	        return {};
+	}
+
+	const auto result = commands[*commandOpt];
+
+	if (fs::path(result.Filename).is_absolute()) {
+		std::cerr << "error: filename '" << result.Filename << "' should be relative in compile command " << std::endl;
+		return {};
+	}
+
+	return result;
+}
+
+// FixedCompilationDatabase does too much futzing
+class SingletonDb : public tl::CompilationDatabase {
+	tl::CompileCommand cmd;
+public:
+	SingletonDb(tl::CompileCommand cmd) : cmd(cmd) {}
+	virtual std::vector<tl::CompileCommand> getCompileCommands(llvm::StringRef) const override { return {cmd}; }
+	virtual std::vector<std::string> getAllFiles() const override { return {cmd.Filename}; }
+};
+
+
 int main(int argc, const char *argv[]){
 	tl::CommonOptionsParser options_parser(argc, argv, simplifier_category);
 
 	const auto& filenames = options_parser.getSourcePathList();
 	if (filenames.size() > 1) {
-		// TODO aggregate processing - merge the results of
-		// processing each TranslationUnit
-		std::cerr << "Warning: All files except " << filenames[0]
-			<< " are being ignored." << std::endl;
+		std::cerr << "warning: ignoring all files except " << filenames[0] << std::endl;
 	}
 
-	std::string filename = filenames[0];
-	tl::ClangTool tool(options_parser.getCompilations(), llvm::ArrayRef<std::string>(filename));
+	const auto command = check_and_get_command(filenames[0], options_parser.getCompilations());
+	if (!command) return 1;
+
+	const SingletonDb db(*command); // first args is reference, hence constructed here
+	tl::ClangTool tool(db, llvm::ArrayRef<std::string>(command->Filename));
 	tool.appendArgumentsAdjuster(remove_clang13_only_flags);
 
-	const std::unordered_set<std::string> rootSet(roots.begin(), roots.end());
-	const auto result = simplify(tool, filename, rootSet);
-
-	std::cout << result.string();
-	return 0;
+	if (const auto result = simplify(tool, std::unordered_set<std::string>(roots.begin(), roots.end()))) {
+		std::cout << result->string();
+		return 0;
+	} else {
+		return 1;
+	}
 }
-

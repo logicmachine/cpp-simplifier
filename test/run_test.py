@@ -107,9 +107,8 @@ class Simplifier:
 
     def run(self, input_rel_path):
         cwd = os.getcwd()
-        proc = subprocess.Popen([self.simplifier, input_rel_path], stdout=subprocess.PIPE)
-        result = proc.communicate()[0].decode('utf-8')
-        return result
+        completed = subprocess.run([self.simplifier, input_rel_path], capture_output=True, text=True)
+        return completed.stdout if completed.stdout != None else completed.stderr
 
     def output(self, input_rel_path):
         out_dir = self.run(input_rel_path)

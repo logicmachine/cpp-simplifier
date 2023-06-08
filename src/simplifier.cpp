@@ -84,10 +84,7 @@ namespace tl = clang::tooling;
 namespace fs = std::filesystem;
 
 std::ofstream create(const fs::path tmp_dir, const fs::path& filepath){
-	if (filepath.is_absolute()) {
-		std::cerr << "Please fix compile_commands.json to use relative path for " << filepath << std::endl;
-		std::exit(1);
-	}
+	assert (filepath.is_relative());
 	// operator/ returns the RHS if it is an absolute path, which overwrites the user's file!
 	const auto newpath = tmp_dir / filepath;
 	fs::create_directories(fs::path(newpath).remove_filename());
@@ -96,24 +93,22 @@ std::ofstream create(const fs::path tmp_dir, const fs::path& filepath){
 
 fs::path gen_tmp_dir(){
 	std::random_device rd;
-	std::uniform_int_distribution<int> dist(0, 16777216);
-	const auto hex = dist(rd);
+	const auto len = 6; // 0 < len < 16
+	std::uniform_int_distribution<int> dist(0, 1 << (len * 4));
 	std::ostringstream oss;
-	oss << "c-simplifier-" << std::setfill('0') << std::setw(6) << std::hex << dist(rd);
+	oss << "c-simplifier-" << std::setfill('0') << std::setw(len) << std::hex << dist(rd);
 	const auto result = fs::temp_directory_path() / fs::path(oss.str());
 	return fs::exists(result) ? gen_tmp_dir() : result;
 }
 
-fs::path simplify(
+std::optional<fs::path> simplify(
 	tl::ClangTool &tool,
-	const std::string &input_filename,
 	const std::unordered_set<std::string> &roots)
 {
 	auto marker = std::make_shared<ReachabilityMarker>();
 	ReachabilityAnalyzerFactory analyzer_factory(marker, roots);
-	if(tool.run(&analyzer_factory) != 0){
-		throw std::runtime_error("compilation error");
-	}
+	const auto errs = tool.run(&analyzer_factory);
+	if(errs != 0) return {};
 
 	const auto result = gen_tmp_dir();
 	for (const auto& it : *marker){
