@@ -1,2 +1,5 @@
-(test
- (name comment_simplifier))
+(library
+ (name test)
+ (libraries comment_simplifier)
+ (inline_tests)
+ (preprocess (pps ppx_expect)))

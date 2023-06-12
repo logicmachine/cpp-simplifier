@@ -2,16 +2,18 @@
 open Lexing
 ;;
 
-(* TODO add file name *)
-exception Eof_in_comment
+type err =
+  (* TODO add file name *)
+  | Eof_in_comment
+  (* TODO add location *)
+  | Eof_in_string
+  (* TODO add location *)
+  | Newline_in_string
+  (* TODO add location information *)
+  | No_code_after_multi_line_block_comment
 ;;
 
-(* TODO add location *)
-exception Ignored_line_in_kept_block_comment
-;;
-
-(* TODO add location information *)
-exception No_code_after_multi_line_block_comment
+exception Error of err
 ;;
 
 let rev_char_list str =
@@ -38,7 +40,7 @@ let ws = space_tab | '\\' space_tab
 let esc_nl = '\\' '\n'
 let ignor = "//-"
 
-(* rtart of a line, may or may not be kept *)
+(* start of a line, may or may not be kept *)
 rule line_start write = parse
   | ignor { ignored_line [] write lexbuf }
   | eof   { () }
@@ -55,20 +57,35 @@ and kept_line write = parse
   | "/*"   { String.iter write (lexeme lexbuf);
              kept_block_comment write lexbuf;
              kept_line write lexbuf }
+  | '"'    { write (lexeme_char lexbuf 0);
+             kept_str write lexbuf;
+             kept_line write lexbuf }
   | _      { write (lexeme_char lexbuf 0);
              kept_line write lexbuf }
 
 and kept_block_comment write = parse
-  | eof        { raise Eof_in_comment }
+  | eof        { raise @@ Error Eof_in_comment }
   | '\n' ignor
   | '\n'       { newline kept_block_comment ~write lexbuf }
   | "*/"       { String.iter write (lexeme lexbuf) }
   | _          { write (lexeme_char lexbuf 0);
                  kept_block_comment write lexbuf }
 
+and kept_str write = parse
+  | eof      { raise @@ Error Eof_in_string }
+  | esc_nl   { esc_newline kept_str ~write lexbuf }
+  | '\\' '\\'
+  | '\\' '"' { String.iter write (lexeme lexbuf);
+               kept_str write lexbuf }
+  | '"'      { write (lexeme_char lexbuf 0) }
+  | '\n'     { raise @@ Error Newline_in_string }
+  | _        { write (lexeme_char lexbuf 0);
+               kept_str write lexbuf }
+
 (* assume: - in ignored line,"//-" not written, `buf' seen so far *)
 and ignored_line buf write = parse
-  | ws   { ignored_line (rev_char_list (lexeme lexbuf) @ buf) write lexbuf }
+  | eof    { List.iter write (List.rev buf) }
+  | ws     { ignored_line (rev_char_list (lexeme lexbuf) @ buf) write lexbuf }
   | esc_nl ignor
   | esc_nl { String.iter write "//-";
              List.iter write (List.rev buf);
@@ -103,7 +120,7 @@ and commented_line write = parse
 
 (* in a block comment, with //- delete-able *)
 and ignored_block_comment lines_buf = parse
-  | eof    { raise Eof_in_comment }
+  | eof    { raise @@ Error Eof_in_comment }
   (* weird, yes, but \ removal takes place _before_ comment recognition *)
   | esc_nl ignor
   | esc_nl { let (lines, buf) = lines_buf in
@@ -122,11 +139,13 @@ and ignored_block_comment lines_buf = parse
 and empty_line write = parse
   | eof    { () }
   | esc_nl { esc_newline empty_line ~write lexbuf }
+  | "//"   { String.iter write (lexeme lexbuf);
+             commented_line write lexbuf }
   | '\n'   { newline line_start ~write lexbuf }
   | "/*"   { String.iter write (lexeme lexbuf);
              kept_block_comment write lexbuf;
              empty_line write lexbuf }
   | ws     { String.iter write (lexeme lexbuf);
              empty_line write lexbuf }
-  | _      { (* maybe make this a warning? *) raise No_code_after_multi_line_block_comment }
+  | _      { raise @@ Error No_code_after_multi_line_block_comment }
 

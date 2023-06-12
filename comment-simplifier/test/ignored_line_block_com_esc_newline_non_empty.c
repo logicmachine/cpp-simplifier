@@ -1,2 +1,0 @@
-//- /* stuff \
-*/ int main();
