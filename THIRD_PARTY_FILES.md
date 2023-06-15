@@ -1,6 +1,9 @@
-The following parts of C-simplifier contain new code released under the
+The following parts of c-tree-carver contain new code released under the
 BSD 2-Clause License:
-* `src/debug.hpp`
+* `cpp/src/debug.hpp`
+* `lib`
+* `bin`
+* `test`
 
 Copyright (c) 2022 Dhruv Makwana
 All rights reserved.

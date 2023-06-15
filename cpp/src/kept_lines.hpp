@@ -1,7 +1,14 @@
+// clang-format off
 /************************************************************************************/
-/*  The following parts of C-simplifier contain new code released under the         */
+/*  The following parts of c-tree-carver contain new code released under the        */
 /*  BSD 2-Clause License:                                                           */
-/*  * `src/debug.hpp`                                                               */
+/*  * `bin`                                                                         */
+/*  * `cpp/src/debug.hpp`                                                           */
+/*  * `cpp/src/debug_printers.cpp`                                                  */
+/*  * `cpp/src/debug_printers.hpp`                                                  */
+/*  * `cpp/src/source_range_hash.hpp`                                               */
+/*  * `lib`                                                                         */
+/*  * `test`                                                                        */
 /*                                                                                  */
 /*  Copyright (c) 2022 Dhruv Makwana                                                */
 /*  All rights reserved.                                                            */
@@ -67,45 +74,42 @@
 /*  SOFTWARE.                                                                       */
 /************************************************************************************/
 
-#ifndef CPP_SIMPLIFIER_REACHABILITY_MARKER_HPP
-#define CPP_SIMPLIFIER_REACHABILITY_MARKER_HPP
+// clang-format on
+
+#pragma once
 
 #include <string>
 #include <unordered_map>
 #include <vector>
 
-class ReachabilityMarker {
+class KeptLines {
 
-private:
-	std::unordered_map<std::string, std::vector<bool>> m_map;
+  private:
+    std::unordered_map<std::string, std::vector<bool>> kept_files;
 
-public:
-	ReachabilityMarker() = default;
+  public:
+    KeptLines() = default;
 
-	void mark(const std::string file, unsigned int line){
-		auto& marker = m_map[file];
-		while(marker.size() <= line){
-			marker.push_back(false);
-		}
-		marker[line] = true;
-	}
+    void keep(const std::string file, unsigned int line) {
+        auto &file_lines = kept_files[file];
+        while (file_lines.size() <= line) {
+            file_lines.push_back(false);
+        }
+        file_lines[line] = true;
+    }
 
-	bool operator()(const std::string file, unsigned int line) const {
-		if (m_map.find(file) == m_map.end()){ return false; }
-		const auto& marker = m_map.at(file);
-		if(line >= marker.size()){ return false; }
-		return marker[line];
-	}
+    bool operator()(const std::string file, unsigned int line) const {
+        if (kept_files.find(file) == kept_files.end()) {
+            return false;
+        }
+        const auto &file_lines = kept_files.at(file);
+        if (line >= file_lines.size()) {
+            return false;
+        }
+        return file_lines[line];
+    }
 
-	auto begin() const noexcept {
-		return m_map.begin();
-	}
+    auto begin() const noexcept { return kept_files.begin(); }
 
-	auto end() const noexcept {
-		return m_map.end();
-	}
-
+    auto end() const noexcept { return kept_files.end(); }
 };
-
-#endif
-

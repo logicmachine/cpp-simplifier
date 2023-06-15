@@ -2,8 +2,11 @@
 set -euo pipefail
 
 headache -c etc/headache_config -r \
-    .gitignore .travis.yml README.md cmake/FindLLVM.cmake src/CMakeLists.txt \
-    `find src -name '*.cpp'` \
-    `find src -name '*.hpp' ! -path 'src/debug.hpp'` \
-    `find test -name '*.py'` \
-    src/debug.hpp
+    .gitignore .travis.yml README.md \
+    cpp/src/CMakeLists.txt \
+    `find cpp/src -name '*.cpp'` \
+    `find cpp/src -name '*.hpp'` \
+    `find cpp/test -name '*.py'` \
+    `find lib  -name '*.ml*'` \
+    `find bin  -name '*.ml'`  \
+    `find test -name '*.ml'`

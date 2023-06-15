@@ -1,0 +1,12 @@
+lib: [
+  "_build/install/default/lib/c-tree-carver/META"
+  "_build/install/default/lib/c-tree-carver/dune-package"
+  "_build/install/default/lib/c-tree-carver/opam"
+]
+bin: [
+  "_build/install/default/bin/c-tree-carve"
+  "_build/install/default/bin/clang-tree-carve.exe"
+]
+doc: [
+  "_build/install/default/doc/c-tree-carver/README.md"
+]

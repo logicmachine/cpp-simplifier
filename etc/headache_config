@@ -1,8 +1,11 @@
 # C++
 | ".*\\.hpp"        -> frame open:"/*" line:"*" close:"*/"
 | ".*\\.cpp"        -> frame open:"/*" line:"*" close:"*/"
+| ".*\\.hpp"        -> skip match:"// clang-format off"
+| ".*\\.cpp"        -> skip match:"// clang-format off"
 # Python
 | ".*\\.py"         -> frame  open:"#" line:"#"  close:"#"
+| ".*\\.py"         -> skip match:"#!.*"
 # Misc
 | "CMakeLists.txt"  -> frame open:"#"  line:"#" close:"#"
 | ".*\\.cmake"      -> frame open:"#"  line:"#" close:"#"

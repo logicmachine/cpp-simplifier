@@ -1,7 +1,13 @@
 ####################################################################################
-#  The following parts of C-simplifier contain new code released under the         #
+#  The following parts of c-tree-carver contain new code released under the        #
 #  BSD 2-Clause License:                                                           #
-#  * `src/debug.hpp`                                                               #
+#  * `bin`                                                                         #
+#  * `cpp/src/debug.hpp`                                                           #
+#  * `cpp/src/debug_printers.cpp`                                                  #
+#  * `cpp/src/debug_printers.hpp`                                                  #
+#  * `cpp/src/source_range_hash.hpp`                                               #
+#  * `lib`                                                                         #
+#  * `test`                                                                        #
 #                                                                                  #
 #  Copyright (c) 2022 Dhruv Makwana                                                #
 #  All rights reserved.                                                            #
@@ -67,36 +73,25 @@
 #  SOFTWARE.                                                                       #
 ####################################################################################
 
-language: cpp
-compiler:
-  - g++
+language: c
 install:
-  - if [ "$CXX" = "g++" ]; then export CXX="g++-5" CC="gcc-5" ; fi 
-  - mkdir build && cd build
-  - cmake -DCMAKE_BUILD_TYPE=Release ../src
-  - make
+  - test -e .travis-opam.sh || wget https://raw.githubusercontent.com/ocaml/ocaml-ci-scripts/master/.travis-opam.sh
 script:
-  - python ../test/run_test.py ./cpp-simplifier
+  - bash -ex .travis-opam.sh
+  - opam install .
+  - dune runtest
+  - cd cpp && ./test/run_test.py for
+env:
+  - OCAML_VERSION=4.12
+  - PACKAGE=c-tree-carver
+os:
+  - linux
+  - osx
+arch:
+  - amd64
+dist: focal
 addons:
   apt:
-    sources:
-    - ubuntu-toolchain-r-test
-    - llvm-toolchain-trusty-8.0
     packages:
-    - gcc-5
-    - g++-5
-    - cmake3
-    - cmake3-data
-    - libboost-program-options-dev
-    - clang-8.0
-    - libclang-common-8.0-dev
-    - libclang-8.0-dev
-    - libclang1-8.0
-    - libllvm8.0
-    - lldb-8.0
-    - llvm-8.0
-    - llvm-8.0-dev
-    - llvm-8.0-runtime
-    - liblldb-8.0-dev
-    - python-clang-8.0
-sudo: false
+    - llvm-12-dev
+    - libclang-12-dev

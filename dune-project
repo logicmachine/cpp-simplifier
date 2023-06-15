@@ -1,26 +1,34 @@
 (lang dune 3.7)
 
-(name comment_simplifier)
+(name c-tree-carver)
 
 (generate_opam_files true)
 
 (source
- (github username/reponame))
+ (github rems-project/c-tree-carver))
 
-(authors "Author Name")
+(authors "Dhruv Makwana <dhruv.makwana@cl.cam.ac.uk")
 
-(maintainers "Maintainer Name")
+(maintainers "Dhruv Makwana <dhruv.makwana@cl.cam.ac.uk")
 
-(license LICENSE)
+(license MIT BSD-2-Clause)
 
 (documentation https://url/to/documentation)
 
 (package
- (name comment_simplifier)
- (synopsis "A short synopsis")
- (description "A longer description")
- (depends ocaml dune)
+ (name c-tree-carver)
+ (synopsis "Clang-based tool for tree-carving C source trees")
+ (description "")
+ (depends
+     (ocaml (>= 4.12.0))
+     (dune (>= 3.7.0))
+     (fileutils (>= 0.6.4))
+     (shexp (>= v0.15.0))
+     (ocamlformat (and (>= 0.25.1) :dev))
+     (ppx_expect (and (>= v0.15.1) :with-test)))
  (tags
-  (topics "to describe" your project)))
+  (topics c clang tool tree-carving)))
+
+(formatting)
 
 ; See the complete stanza docs at https://dune.readthedocs.io/en/stable/dune-files.html#dune-project

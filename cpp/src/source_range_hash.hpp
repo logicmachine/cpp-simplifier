@@ -39,20 +39,18 @@
 /***************************************************************************/
 
 // clang-format on
+#include <clang/Basic/SourceLocation.h>
+#include <unordered_set>
 
 #pragma once
 
-// This boolean is set to true if the '-d' command line option is specified.
-// This should probably not be referenced directly, instead, use the DEBUG macro
-// below.
+struct SourceRangeHash {
+    size_t operator()(const clang::SourceRange &range) const {
+        size_t result = std::hash<unsigned>()(range.getBegin().getRawEncoding());
+        result <<= sizeof(unsigned) * 8;
+        result |= std::hash<unsigned>()(range.getEnd().getRawEncoding());
+        return result;
+    }
+};
 
-extern bool debugOn;
-
-// CTC_DEBUG macro - This macro should be used by code to emit debug
-// information. In the '-d' option is specified on the command line, and if this
-// is a debug build, then the code specified as the option to the macro will be
-// executed.  Otherwise it will not be.
-// clang-format off
-#define CTC_DEBUG(X) \
-    do { if (debugOn) { X; } } while (0)
-// clang-format on
+using SourceRangeSet = std::unordered_set<clang::SourceRange, SourceRangeHash>;

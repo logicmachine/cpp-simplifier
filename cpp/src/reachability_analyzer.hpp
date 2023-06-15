@@ -1,7 +1,14 @@
+// clang-format off
 /************************************************************************************/
-/*  The following parts of C-simplifier contain new code released under the         */
+/*  The following parts of c-tree-carver contain new code released under the        */
 /*  BSD 2-Clause License:                                                           */
-/*  * `src/debug.hpp`                                                               */
+/*  * `bin`                                                                         */
+/*  * `cpp/src/debug.hpp`                                                           */
+/*  * `cpp/src/debug_printers.cpp`                                                  */
+/*  * `cpp/src/debug_printers.hpp`                                                  */
+/*  * `cpp/src/source_range_hash.hpp`                                               */
+/*  * `lib`                                                                         */
+/*  * `test`                                                                        */
 /*                                                                                  */
 /*  Copyright (c) 2022 Dhruv Makwana                                                */
 /*  All rights reserved.                                                            */
@@ -67,172 +74,150 @@
 /*  SOFTWARE.                                                                       */
 /************************************************************************************/
 
-#ifndef CPP_SIMPLIFIER_REACHABILITY_ANALYZER_HPP
-#define CPP_SIMPLIFIER_REACHABILITY_ANALYZER_HPP
+// clang-format on
 
-#include <memory>
-#include <unordered_set>
-#include <clang/AST/ASTConsumer.h>
-#include <clang/Frontend/FrontendActions.h>
-#include <clang/Frontend/CompilerInstance.h>
-#include <clang/Tooling/Tooling.h>
+#pragma once
+
 #include "debug.hpp"
-#include "reachability_marker.hpp"
-
-struct SourceRangeHash {
-	size_t operator()(const clang::SourceRange &range) const
-	{
-		size_t result = std::hash<unsigned>()(range.getBegin().getRawEncoding());
-		result <<= sizeof(unsigned) * 8;
-		result |= std::hash<unsigned>()(range.getEnd().getRawEncoding());
-		return result;
-	}
-};
-
-using SourceRangeSet = std::unordered_set<clang::SourceRange, SourceRangeHash>;
+#include "debug_printers.hpp"
+#include "kept_lines.hpp"
+#include "source_range_hash.hpp"
+#include <clang/AST/ASTConsumer.h>
+#include <clang/Frontend/CompilerInstance.h>
+#include <clang/Frontend/FrontendActions.h>
+#include <clang/Tooling/Tooling.h>
+#include <iostream>
+#include <memory>
+#include <sstream>
+#include <unordered_set>
 
 class PPRecordNested : public clang::PPCallbacks {
-public:
-	using RangeToSet = std::unordered_map<clang::SourceRange, SourceRangeSet, SourceRangeHash>;
-	using RangeToRange = std::unordered_map<clang::SourceRange, clang::SourceRange, SourceRangeHash>;
-private:
-	RangeToSet& m_macro_deps;
-	RangeToRange& m_range_hack;
-	const clang::SourceManager &m_sm;
-public:
-	clang::SourceRange defn_range(const clang::MacroDefinition& MD) {
-		auto macro_info = MD.getMacroInfo();
-		assert (macro_info);
-		return clang::SourceRange(macro_info->getDefinitionLoc(), macro_info->getDefinitionEndLoc());
-	}
+  public:
+    using RangeToSet = std::unordered_map<clang::SourceRange, SourceRangeSet, SourceRangeHash>;
+    using RangeToRange =
+        std::unordered_map<clang::SourceRange, clang::SourceRange, SourceRangeHash>;
 
-	virtual void MacroDefined(
-		const clang::Token &Id
-		, const clang::MacroDirective* MD) override
-	{
-		assert (MD);
-		auto macro_info = MD->getMacroInfo();
-		assert (macro_info);
-		auto orig = clang::SourceRange(macro_info->getDefinitionLoc(), macro_info->getDefinitionEndLoc());
-		// orig.getEnd() is the starting point of the last macro token. For some reason
-		// (I think that because of how C handles string literals with whitespace and new
-		// lines before it, the source location for the end of macro (like the example below)
-		// ends up being 1:15 rather than 2:1, which lead to the previous wrong output,
-		// rather than the intended one. Inserting a leading space made was a simple
-		// work-around, but actually recording the (inclusive) location of the end of the
-		// last token fixes the problem.
-		//
-		// input:
-		// ```
-		// 1|#define MACRO \
+  private:
+    RangeToSet &m_macro_deps;
+    RangeToRange &m_range_hack;
+    const clang::SourceManager &m_sm;
+
+  public:
+    static clang::SourceRange defn_range(const clang::MacroDefinition &MD) {
+        auto *macro_info = MD.getMacroInfo();
+        assert(macro_info);
+        return clang::SourceRange(macro_info->getDefinitionLoc(),
+                                  macro_info->getDefinitionEndLoc());
+    }
+
+    void MacroDefined(const clang::Token &Id, const clang::MacroDirective *MD) override {
+        assert(MD);
+        const auto *macro_info = MD->getMacroInfo();
+        assert(macro_info);
+        auto orig =
+            clang::SourceRange(macro_info->getDefinitionLoc(), macro_info->getDefinitionEndLoc());
+        // orig.getEnd() is the starting point of the last macro token. For some
+        // reason (I think that because of how C handles string literals with
+        // whitespace and new lines before it, the source location for the end of
+        // macro (like the example below) ends up being 1:15 rather than 2:1, which
+        // lead to the previous wrong output, rather than the intended one.
+        // Inserting a leading space made was a simple work-around, but actually
+        // recording the (inclusive) location of the end of the last token fixes the
+        // problem.
+        //
+        // input:
+        // ```
+        // 1|#define MACRO \
 		// 2|"hi"
-		// ```
-		//
-		// intended output:
-		// ```
-		// 1|#define MACRO \
+        // ```
+        //
+        // intended output:
+        // ```
+        // 1|#define MACRO \
 		// 2|"hi"
-		//
-		/// previous wrong output:
-		// ```
-		// 1|#define MACRO \
+        //
+        /// previous wrong output:
+        // ```
+        // 1|#define MACRO \
 		// 2|//-"hi"
-		// ```
-		//
-		// Futhermore, it seems like the PreprocessingRecord is filled up first, before any
-		// user-defined callbacks are run. This means that adjusting the source range for
-		// macros in HandleMacroDefine is too late.
-		if (const auto num_tokens = macro_info->getNumTokens(); num_tokens > 0) {
-			const auto& last_token = macro_info->getReplacementToken(macro_info->getNumTokens()-1);
-			m_range_hack[orig] = clang::SourceRange(orig.getBegin(),
-				last_token.getLocation().getLocWithOffset(last_token.getLength()-1));
-		} else {
-			m_range_hack[orig] = clang::SourceRange(orig.getBegin(),
-				orig.getBegin().getLocWithOffset(Id.getLength()-1));
-		}
-	}
+        // ```
+        //
+        // Futhermore, it seems like the PreprocessingRecord is filled up first,
+        // before any user-defined callbacks are run. This means that adjusting the
+        // source range for macros in HandleMacroDefine is too late.
+        if (const auto num_tokens = macro_info->getNumTokens(); num_tokens > 0) {
+            const auto &last_token =
+                macro_info->getReplacementToken(macro_info->getNumTokens() - 1);
+            m_range_hack[orig] = clang::SourceRange(
+                orig.getBegin(),
+                last_token.getLocation().getLocWithOffset(last_token.getLength() - 1));
+        } else {
+            m_range_hack[orig] = clang::SourceRange(
+                orig.getBegin(), orig.getBegin().getLocWithOffset(Id.getLength() - 1));
+        }
+    }
 
-	virtual void MacroExpands(
-		const clang::Token &Id
-		, const clang::MacroDefinition &MD
-		, clang::SourceRange Range
-		, const clang::MacroArgs *Args) override
-	{
-		static bool assigned = false;
-		static clang::SourceRange outer_macro_defn_range;
-		if (!Id.getLocation().isMacroID()) {
-			outer_macro_defn_range = defn_range(MD);
-			assigned = true;
-			SIMP_DEBUG(std::cerr << "TL Macro: " << Id.getIdentifierInfo()->getNameStart() << std::endl);
-		} else {
-			assert (assigned);
-			int count = 0;
-			for (auto loc = Id.getLocation(); loc.isMacroID(); loc = m_sm.getImmediateMacroCallerLoc(loc), count++)
-			{}
-			SIMP_DEBUG(std::cerr << std::string(count * 2, ' ') << Id.getIdentifierInfo()->getNameStart() << std::endl);
-			m_macro_deps[outer_macro_defn_range].emplace(defn_range(MD));
-		}
-	}
-	PPRecordNested(RangeToSet& macro_deps, RangeToRange& range_hack
-		, const clang::SourceManager& sm)
-		: clang::PPCallbacks()
-		, m_macro_deps(macro_deps)
-		, m_range_hack(range_hack)
-		, m_sm(sm)
-	{
-		// for macros defined via the command line
-		auto invalid = clang::SourceRange();
-		m_range_hack[invalid] = invalid;
-	}
-	virtual ~PPRecordNested() { }
+    void MacroExpands(const clang::Token &Id, const clang::MacroDefinition &MD,
+                      clang::SourceRange Range, const clang::MacroArgs *Args) override {
+        static bool assigned = false;
+        static clang::SourceRange outer_macro_defn_range;
+        if (!Id.getLocation().isMacroID()) {
+            outer_macro_defn_range = defn_range(MD);
+            assigned = true;
+            CTC_DEBUG(std::cerr << "TL Macro: " << Id.getIdentifierInfo()->getNameStart()
+                                << std::endl);
+        } else {
+            assert(assigned);
+            int count = 0;
+            for (auto loc = Id.getLocation(); loc.isMacroID();
+                 loc = m_sm.getImmediateMacroCallerLoc(loc), count++) {
+            }
+            CTC_DEBUG(std::cerr << std::string(count * 2, ' ')
+                                << Id.getIdentifierInfo()->getNameStart() << std::endl);
+            m_macro_deps[outer_macro_defn_range].emplace(defn_range(MD));
+        }
+    }
+    PPRecordNested(RangeToSet &macro_deps, RangeToRange &range_hack, const clang::SourceManager &sm)
+        : m_macro_deps(macro_deps), m_range_hack(range_hack), m_sm(sm) {
+        // for macros defined via the command line
+        auto invalid = clang::SourceRange();
+        m_range_hack[invalid] = invalid;
+    }
+    virtual ~PPRecordNested() {}
 };
 
 class ReachabilityAnalyzer : public clang::ASTFrontendAction {
 
-private:
-	std::shared_ptr<ReachabilityMarker> m_marker;
-	SourceRangeSet m_ranges;
-	const std::unordered_set<std::string>& m_roots;
+  private:
+    std::optional<KeptLines> &kept_lines;
+    SourceRangeSet m_ranges;
+    const std::unordered_set<std::string> &roots;
 
-protected:
-	void ExecuteAction() override;
+  protected:
+    void ExecuteAction() override;
 
-	void findMacroDefns(
-		clang::PreprocessingRecord& pr,
-		const clang::SourceManager& sm,
-		clang::SourceRange range,
-		const PPRecordNested::RangeToSet& macro_deps,
-		const PPRecordNested::RangeToRange& range_hack,
-		SourceRangeSet& marked);
-public:
-	class ASTConsumer;
+    void findMacroDefns(clang::PreprocessingRecord &pr, const clang::SourceManager &sm,
+                        clang::SourceRange range, const PPRecordNested::RangeToSet &macro_deps,
+                        const PPRecordNested::RangeToRange &range_hack, SourceRangeSet &marked);
 
-	ReachabilityAnalyzer(
-		std::shared_ptr<ReachabilityMarker> marker,
-		const std::unordered_set<std::string>& roots);
+  public:
+    class ASTConsumer;
 
-	virtual std::unique_ptr<clang::ASTConsumer> CreateASTConsumer(
-		clang::CompilerInstance &ci,
-		llvm::StringRef in_file) override;
+    ReachabilityAnalyzer(std::optional<KeptLines> &kept_lines,
+                         const std::unordered_set<std::string> &roots);
 
+    std::unique_ptr<clang::ASTConsumer> CreateASTConsumer(clang::CompilerInstance &ci,
+                                                          llvm::StringRef in_file) override;
 };
 
-class ReachabilityAnalyzerFactory
-	: public clang::tooling::FrontendActionFactory
-{
+class ReachabilityAnalyzerFactory : public clang::tooling::FrontendActionFactory {
 
-private:
-	std::shared_ptr<ReachabilityMarker> m_marker;
-	const std::unordered_set<std::string>& m_roots;
+    std::optional<KeptLines> &kept_lines;
+    const std::unordered_set<std::string> &roots;
 
-public:
-	ReachabilityAnalyzerFactory(
-		std::shared_ptr<ReachabilityMarker> marker,
-		const std::unordered_set<std::string>& roots);
+  public:
+    ReachabilityAnalyzerFactory(std::optional<KeptLines> &kept_lines,
+                                const std::unordered_set<std::string> &roots);
 
-	virtual std::unique_ptr<clang::FrontendAction> create() override;
-
+    std::unique_ptr<clang::FrontendAction> create() override;
 };
-
-#endif
-

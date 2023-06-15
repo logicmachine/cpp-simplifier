@@ -39,20 +39,16 @@
 /***************************************************************************/
 
 // clang-format on
+#include <clang/AST/Decl.h>
+#include <clang/Basic/SourceManager.h>
+#include <string>
 
 #pragma once
 
-// This boolean is set to true if the '-d' command line option is specified.
-// This should probably not be referenced directly, instead, use the DEBUG macro
-// below.
+// getPresumedLoc has an optional boolean UseLineDirectives
+// should be useful if we ever want to handle preprocessed files
+std::string RangeToString(clang::SourceRange range, const clang::SourceManager &sm);
 
-extern bool debugOn;
+void debugDecl(int depth, char type, const clang::Decl *decl, const clang::SourceManager &sm);
 
-// CTC_DEBUG macro - This macro should be used by code to emit debug
-// information. In the '-d' option is specified on the command line, and if this
-// is a debug build, then the code specified as the option to the macro will be
-// executed.  Otherwise it will not be.
-// clang-format off
-#define CTC_DEBUG(X) \
-    do { if (debugOn) { X; } } while (0)
-// clang-format on
+void debugStr(int depth, const std::string type, const std::string &info);

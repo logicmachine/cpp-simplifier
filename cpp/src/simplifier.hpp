@@ -1,7 +1,14 @@
+// clang-format off
 /************************************************************************************/
-/*  The following parts of C-simplifier contain new code released under the         */
+/*  The following parts of c-tree-carver contain new code released under the        */
 /*  BSD 2-Clause License:                                                           */
-/*  * `src/debug.hpp`                                                               */
+/*  * `bin`                                                                         */
+/*  * `cpp/src/debug.hpp`                                                           */
+/*  * `cpp/src/debug_printers.cpp`                                                  */
+/*  * `cpp/src/debug_printers.hpp`                                                  */
+/*  * `cpp/src/source_range_hash.hpp`                                               */
+/*  * `lib`                                                                         */
+/*  * `test`                                                                        */
 /*                                                                                  */
 /*  Copyright (c) 2022 Dhruv Makwana                                                */
 /*  All rights reserved.                                                            */
@@ -67,17 +74,15 @@
 /*  SOFTWARE.                                                                       */
 /************************************************************************************/
 
-#ifndef CPP_SIMPLIFIER_SIMPLIFIER_HPP
-#define CPP_SIMPLIFIER_SIMPLIFIER_HPP
+// clang-format on
 
+#pragma once
+
+#include <clang/Tooling/Tooling.h>
 #include <filesystem>
 #include <optional>
 #include <string>
 #include <unordered_set>
 
-std::optional<std::filesystem::path> simplify(
-	clang::tooling::ClangTool &tool,
-	const std::unordered_set<std::string> &roots);
-
-#endif
-
+std::optional<std::filesystem::path> simplify(clang::tooling::ClangTool &tool,
+                                              const std::unordered_set<std::string> &roots);

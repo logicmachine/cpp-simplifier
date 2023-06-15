@@ -1,0 +1,38 @@
+(install
+ (files clang-tree-carve.exe)
+ (section bin)
+ (package c-tree-carver))
+
+(rule
+ (deps
+  (source_tree src)
+  cmake_build_type.txt)
+ (targets clang-tree-carve.exe)
+ (action
+  (no-infer
+   (progn
+    (with-stdout-to
+     cmake_generator.txt
+     (run
+      cmake
+      -D CMAKE_BUILD_TYPE=%{read:cmake_build_type.txt}
+      -S src
+      -B _build))
+    (with-stdout-to
+     cmake_build.txt
+     (run cmake --build _build))
+    (copy _build/clang-tree-carve clang-tree-carve.exe)))))
+
+(rule
+ (enabled_if
+  (= %{profile} "release"))
+ (targets cmake_build_type.txt)
+ (action
+  (write-file cmake_build_type.txt "RelWithDebInfo")))
+
+(rule
+ (enabled_if
+  (= %{profile} "dev"))
+ (targets cmake_build_type.txt)
+ (action
+  (write-file cmake_build_type.txt "Debug")))

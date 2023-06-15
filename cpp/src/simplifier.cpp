@@ -1,7 +1,14 @@
+// clang-format off
 /************************************************************************************/
-/*  The following parts of C-simplifier contain new code released under the         */
+/*  The following parts of c-tree-carver contain new code released under the        */
 /*  BSD 2-Clause License:                                                           */
-/*  * `src/debug.hpp`                                                               */
+/*  * `bin`                                                                         */
+/*  * `cpp/src/debug.hpp`                                                           */
+/*  * `cpp/src/debug_printers.cpp`                                                  */
+/*  * `cpp/src/debug_printers.hpp`                                                  */
+/*  * `cpp/src/source_range_hash.hpp`                                               */
+/*  * `lib`                                                                         */
+/*  * `test`                                                                        */
 /*                                                                                  */
 /*  Copyright (c) 2022 Dhruv Makwana                                                */
 /*  All rights reserved.                                                            */
@@ -67,65 +74,71 @@
 /*  SOFTWARE.                                                                       */
 /************************************************************************************/
 
+// clang-format on
+
+#include "simplifier.hpp"
+#include "reachability_analyzer.hpp"
+#include <clang/Frontend/CompilerInstance.h>
+#include <clang/Tooling/ArgumentsAdjusters.h>
+#include <clang/Tooling/CompilationDatabase.h>
+#include <clang/Tooling/Tooling.h>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <memory>
 #include <random>
 #include <sstream>
-#include <clang/Frontend/CompilerInstance.h>
-#include <clang/Tooling/Tooling.h>
-#include <clang/Tooling/CompilationDatabase.h>
-#include <clang/Tooling/ArgumentsAdjusters.h>
-#include "simplifier.hpp"
-#include "reachability_analyzer.hpp"
 
 namespace tl = clang::tooling;
 namespace fs = std::filesystem;
 
-std::ofstream create(const fs::path tmp_dir, const fs::path& filepath){
-	assert (filepath.is_relative());
-	// operator/ returns the RHS if it is an absolute path, which overwrites the user's file!
-	const auto newpath = tmp_dir / filepath;
-	fs::create_directories(fs::path(newpath).remove_filename());
-	return std::ofstream(newpath);
+std::ofstream create(const fs::path tmp_dir, const fs::path &filepath) {
+    assert(filepath.is_relative());
+    // operator/ returns the RHS if it is an absolute path, which overwrites the
+    // user's file!
+    const auto newpath = tmp_dir / filepath;
+    fs::create_directories(fs::path(newpath).remove_filename());
+    return std::ofstream(newpath);
 }
 
-fs::path gen_tmp_dir(){
-	std::random_device rd;
-	const auto len = 6; // 0 < len < 16
-	std::uniform_int_distribution<int> dist(0, 1 << (len * 4));
-	std::ostringstream oss;
-	oss << "c-simplifier-" << std::setfill('0') << std::setw(len) << std::hex << dist(rd);
-	const auto result = fs::temp_directory_path() / fs::path(oss.str());
-	return fs::exists(result) ? gen_tmp_dir() : result;
+fs::path gen_tmp_dir() {
+    std::random_device rd;
+    const auto len = 6; // 0 < len < 16
+    std::uniform_int_distribution<int> dist(0, 1 << (len * 4));
+    std::ostringstream oss;
+    oss << "c-tree-carver-" << std::setfill('0') << std::setw(len) << std::hex << dist(rd);
+    const auto result = fs::temp_directory_path() / fs::path(oss.str());
+    return fs::exists(result) ? gen_tmp_dir() : result;
 }
 
-std::optional<fs::path> simplify(
-	tl::ClangTool &tool,
-	const std::unordered_set<std::string> &roots)
-{
-	auto marker = std::make_shared<ReachabilityMarker>();
-	ReachabilityAnalyzerFactory analyzer_factory(marker, roots);
-	const auto errs = tool.run(&analyzer_factory);
-	if(errs != 0) return {};
+std::optional<fs::path> simplify(tl::ClangTool &tool,
+                                 const std::unordered_set<std::string> &roots) {
 
-	const auto result = gen_tmp_dir();
-	for (const auto& it : *marker){
-		const auto& filename = it.first;
-		SIMP_DEBUG(std::cerr << "Outputting: " << filename << std::endl);
-		auto ofs = create(result, fs::path(filename));
-		const auto& marked = it.second;
-		// open file and iterate line by line
-		std::ifstream iss(filename);
-		std::string line;
-		for(unsigned int i = 0; std::getline(iss, line); ++i){
-			const auto marked_i = i < marked.size() && marked[i];
-			if(!marked_i) ofs << "//-";
-			ofs << line << std::endl;
-		}
-	}
+    std::optional<KeptLines> kept_lines;
+    ReachabilityAnalyzerFactory analyzer_factory(kept_lines, roots);
+    const auto errs = tool.run(&analyzer_factory);
+    if (errs != 0 || !kept_lines)
+        return {};
 
-	return result;
+    const auto result = gen_tmp_dir();
+    for (const auto &it : *kept_lines) {
+
+        const auto &[filename, file_lines] = it;
+        CTC_DEBUG(std::cerr << "Outputting: " << filename << std::endl);
+
+        auto ofs = create(result, fs::path(filename));
+
+        // open file and iterate line by line
+        std::ifstream iss(filename);
+        std::string line;
+
+        for (unsigned int i = 0; std::getline(iss, line); ++i) {
+            const auto marked_i = i < file_lines.size() && file_lines[i];
+            if (!marked_i)
+                ofs << "//-";
+            ofs << line << std::endl;
+        }
+    }
+
+    return result;
 }
-

@@ -1,4 +1,4 @@
 (executable
- (public_name comment_simplifier)
+ (public_name c-tree-carve)
  (name main)
- (libraries comment_simplifier))
+ (libraries str comment_simplifier shexp.process fileutils))

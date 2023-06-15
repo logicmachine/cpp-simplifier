@@ -6,6 +6,9 @@ enum {
   five,
 };
 
+/*@ some long
+ * magic comment @*/
+
 struct S {
     int x[4];
     int y;

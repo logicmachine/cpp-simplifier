@@ -39,20 +39,35 @@
 /***************************************************************************/
 
 // clang-format on
+#include "debug_printers.hpp"
+#include <iostream>
+#include <sstream>
 
-#pragma once
+// getPresumedLoc has an optional boolean UseLineDirectives
+// should be useful if we ever want to handle preprocessed files
+std::string RangeToString(clang::SourceRange range, const clang::SourceManager &sm) {
+    const auto begin = sm.getPresumedLoc(range.getBegin());
+    const auto end = sm.getPresumedLoc(range.getEnd());
+    if (!begin.isValid() || !end.isValid()) {
+        return std::string("invalid");
+    }
+    assert(begin.getFileID() == end.getFileID());
+    std::ostringstream result;
+    result << begin.getFilename() << ", " << begin.getLine() << ':' << begin.getColumn() << " - "
+           << end.getLine() << ':' << end.getColumn();
+    return result.str();
+}
 
-// This boolean is set to true if the '-d' command line option is specified.
-// This should probably not be referenced directly, instead, use the DEBUG macro
-// below.
+void debugDecl(int depth, char type, const clang::Decl *decl, const clang::SourceManager &sm) {
+    std::cerr << std::string(depth * 2, ' ') << type << ": " << decl->getDeclKindName();
+    if (const auto *const named_decl = clang::dyn_cast<clang::NamedDecl>(decl)) {
+        const auto name = named_decl->getNameAsString();
+        std::cerr << " (" << name << ") at ";
+    }
 
-extern bool debugOn;
+    std::cerr << RangeToString(decl->getSourceRange(), sm) << std::endl;
+}
 
-// CTC_DEBUG macro - This macro should be used by code to emit debug
-// information. In the '-d' option is specified on the command line, and if this
-// is a debug build, then the code specified as the option to the macro will be
-// executed.  Otherwise it will not be.
-// clang-format off
-#define CTC_DEBUG(X) \
-    do { if (debugOn) { X; } } while (0)
-// clang-format on
+void debugStr(int depth, const std::string type, const std::string &info) {
+    std::cerr << std::string(depth * 2, ' ') << type << ": " << info << std::endl;
+}

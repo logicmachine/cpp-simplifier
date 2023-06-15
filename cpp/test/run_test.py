@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
 ####################################################################################
-#  The following parts of C-simplifier contain new code released under the         #
+#  The following parts of c-tree-carver contain new code released under the        #
 #  BSD 2-Clause License:                                                           #
-#  * `src/debug.hpp`                                                               #
+#  * `bin`                                                                         #
+#  * `cpp/src/debug.hpp`                                                           #
+#  * `cpp/src/debug_printers.cpp`                                                  #
+#  * `cpp/src/debug_printers.hpp`                                                  #
+#  * `cpp/src/source_range_hash.hpp`                                               #
+#  * `lib`                                                                         #
+#  * `test`                                                                        #
 #                                                                                  #
 #  Copyright (c) 2022 Dhruv Makwana                                                #
 #  All rights reserved.                                                            #
@@ -98,16 +104,16 @@ def write_compile_commands(args):
     with open('compile_commands.json', 'w') as f:
         json.dump(dicts, f, indent=4)
 
-class Simplifier:
+class Carver:
 
-    def __init__(self, simplifier):
-        self.simplifier = simplifier
+    def __init__(self, carver):
+        self.carver = carver
         if not os.path.isfile('compile_commands.json'):
             eprint("run './test/run_test.py make' first")
 
     def run(self, input_rel_path):
         cwd = os.getcwd()
-        completed = subprocess.run([self.simplifier, input_rel_path], capture_output=True, text=True)
+        completed = subprocess.run([self.carver, input_rel_path], capture_output=True, text=True)
         return completed.stdout if completed.stdout != None else completed.stderr
 
     def output(self, input_rel_path):
@@ -116,8 +122,8 @@ class Simplifier:
         with open(actual_path, 'r') as actual:
             return { 'content' : actual.readlines(), 'path': actual_path }
 
-def get_diff(simplifier, input_rel_path):
-    actual = simplifier.output(input_rel_path)
+def get_diff(carver, input_rel_path):
+    actual = carver.output(input_rel_path)
     expect_path = input_rel_path.replace('.in.c', '.out.c')
     with open(expect_path, 'r') as expect:
         return list(difflib.unified_diff(expect.readlines(), actual['content'], expect_path,
@@ -137,9 +143,9 @@ def filter_inputs(test_dir, suffix):
 
 def run_tests(args):
     failed_tests = 0
-    simplifier = Simplifier(args.simplifier)
+    carver = Carver(args.carver)
     for input_rel_path in filter_inputs(args.test_dir, args.suffix):
-        diff = get_diff(simplifier, input_rel_path)
+        diff = get_diff(carver, input_rel_path)
         if args.patch:
             if diff:
                 failed_tests += 1
@@ -153,7 +159,7 @@ def run_tests(args):
     return
 
 # top level
-parser = argparse.ArgumentParser(description="Script for running c-simplifier tests.")
+parser = argparse.ArgumentParser(description="Script for running clang-tree-carve tests.")
 parser.set_defaults(func=(lambda _: parser.parse_args(['-h'])))
 parser.add_argument('--test_dir', help='Directory of tests.', default='test')
 
@@ -168,7 +174,7 @@ parser_make.set_defaults(func=write_compile_commands)
 # for subcommand
 parser_for = subparsers.add_parser('for',
         help='Run the tests for a directory or file.')
-parser_for.add_argument('--simplifier', default='./build/c-simplifier')
+parser_for.add_argument('--carver', default='../_build/default/cpp/clang-tree-carve.exe')
 parser_for.add_argument('--suffix',
         help='Uniquely identifying suffix of a file in compile_commands.json')
 parser_for.add_argument('--patch', help='Output unified format patches for the failing tests.',
