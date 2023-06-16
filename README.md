@@ -73,12 +73,12 @@
 <!--  SOFTWARE.                                                                       -->
 <!--                                                                                  -->
 
-c-simplifier
+c-tree-carver
 ====
 
-C source simplifier for verification tools.
+Carves C source trees into files suitable for verification tools.
 
-This tool simplifies C source directories given some root functions,
+This tool performs tree-carving on a C source-tree given some root functions,
 by retaining only the used declarations.
 
 It is developed to extract and verify progressively larger parts of
