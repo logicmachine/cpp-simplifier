@@ -38,7 +38,6 @@
 (***************************************************************************)
 
 module Cs = Comment_simplifier
-module L = Cs.Lexer
 
 let ignor = "//-"
 let esc_nl = "\\\n"
@@ -55,12 +54,9 @@ let ignored_block_comment =
 let empty_line = [ esc_nl; "//"; "\n"; "/*"; "empty_line" ]
 
 let test_string str =
-  try Cs.from_string str with
-  | L.Error No_code_after_multi_line_block_comment ->
-      print_string "No_code_after_multi_line_block_comment"
-  | L.Error Eof_in_comment -> print_string "Eof_in_comment"
-  | L.Error Eof_in_string -> print_string "Eof_in_string"
-  | L.Error Newline_in_string -> print_string "Newline_in_string"
+  match Cs.from_string str with
+  | Result.Ok () -> ()
+  | Result.Error (reason, pos) -> print_string @@ Cs.format_err reason pos
 
 let test_all tests =
   List.iter
@@ -109,11 +105,11 @@ let%expect_test "line_start -> kept_line -> _" =
     ====
     line_start /*
     -->
-    line_start /*Eof_in_comment
+    line_start /*string:1:13: error: eof in comment
     ====
     line_start "
     -->
-    line_start "Eof_in_string
+    line_start "string:1:12: error: eof in string
     ====
     line_start kept_line
     -->
@@ -150,13 +146,13 @@ let%expect_test "line_start -> kept_line -> kept_line" =
      /*
     -->
     line_start \
-     /*Eof_in_comment
+     /*string:2:3: error: eof in comment
     ====
     line_start \
      "
     -->
     line_start \
-     "Eof_in_string
+     "string:2:2: error: eof in string
     ====
     line_start \
      kept_line
@@ -296,13 +292,13 @@ let%expect_test "line_start -> kept_line -> kept_block_comment" =
     //-
     -->
     line_start /*
-    Eof_in_comment
+    string:2:0: error: eof in comment
     ====
     line_start /*
 
     -->
     line_start /*
-    Eof_in_comment
+    string:2:0: error: eof in comment
     ====
     line_start /* */
     -->
@@ -310,7 +306,7 @@ let%expect_test "line_start -> kept_line -> kept_block_comment" =
     ====
     line_start /* kept_block_comment
     -->
-    line_start /* kept_block_commentEof_in_comment
+    line_start /* kept_block_commentstring:1:32: error: eof in comment
     ==== |}]
 
 let%expect_test "line_start -> kept_line -> kept_block_comment -> \
@@ -322,13 +318,13 @@ let%expect_test "line_start -> kept_line -> kept_block_comment -> \
     //-
     -->
     line_start /* kept_block_comment
-    Eof_in_comment
+    string:2:0: error: eof in comment
     ====
     line_start /* kept_block_comment
 
     -->
     line_start /* kept_block_comment
-    Eof_in_comment
+    string:2:0: error: eof in comment
     ====
     line_start /* kept_block_comment */
     -->
@@ -336,7 +332,7 @@ let%expect_test "line_start -> kept_line -> kept_block_comment -> \
     ====
     line_start /* kept_block_comment kept_block_comment
     -->
-    line_start /* kept_block_comment kept_block_commentEof_in_comment
+    line_start /* kept_block_comment kept_block_commentstring:1:51: error: eof in comment
     ==== |}]
 
 let%expect_test "line_start -> kept_line -> kept_block_comment -> kept_line" =
@@ -361,11 +357,11 @@ let%expect_test "line_start -> kept_line -> kept_block_comment -> kept_line" =
     ====
     line_start /* */ /*
     -->
-    line_start /* */ /*Eof_in_comment
+    line_start /* */ /*string:1:19: error: eof in comment
     ====
     line_start /* */ "
     -->
-    line_start /* */ "Eof_in_string
+    line_start /* */ "string:1:18: error: eof in string
     ====
     line_start /* */ kept_line
     -->
@@ -380,15 +376,15 @@ let%expect_test "line_start -> kept_line -> kept_string" =
 
     -->
     line_start " \
-    Eof_in_string
+    string:2:0: error: eof in string
     ====
     line_start " \\
     -->
-    line_start " \\Eof_in_string
+    line_start " \\string:1:15: error: eof in string
     ====
     line_start " \"
     -->
-    line_start " \"Eof_in_string
+    line_start " \"string:1:15: error: eof in string
     ====
     line_start " "
     -->
@@ -397,11 +393,11 @@ let%expect_test "line_start -> kept_line -> kept_string" =
     line_start "
 
     -->
-    line_start " Newline_in_string
+    line_start " string:1:14: error: new line in string
     ====
     line_start " kept_str
     -->
-    line_start " kept_strEof_in_string
+    line_start " kept_strstring:1:21: error: eof in string
     ==== |}]
 
 let%expect_test "line_start -> kept_line -> kept_string -> kept_line" =
@@ -426,11 +422,11 @@ let%expect_test "line_start -> kept_line -> kept_string -> kept_line" =
     ====
     line_start " " /*
     -->
-    line_start " " /*Eof_in_comment
+    line_start " " /*string:1:17: error: eof in comment
     ====
     line_start " " "
     -->
-    line_start " " "Eof_in_string
+    line_start " " "string:1:16: error: eof in string
     ====
     line_start " " kept_line
     -->
@@ -459,11 +455,11 @@ let%expect_test "line_start -> kept_line -> kept_line" =
     ====
     line_start kept_line /*
     -->
-    line_start kept_line /*Eof_in_comment
+    line_start kept_line /*string:1:23: error: eof in comment
     ====
     line_start kept_line "
     -->
-    line_start kept_line "Eof_in_string
+    line_start kept_line "string:1:22: error: eof in string
     ====
     line_start kept_line kept_line
     -->
@@ -494,7 +490,7 @@ let%expect_test "line_start -> ignored_line" =
     ====
     //- /*
     -->
-    Eof_in_comment
+    string:1:6: error: eof in comment
     ====
     //- //
     -->
@@ -556,17 +552,17 @@ let%expect_test "line_start -> ignored_line -> ignored_block_comment" =
     //- /* \
     //-
     -->
-    Eof_in_comment
+    string:1:12: error: eof in comment
     ====
     //- /* \
 
     -->
-    Eof_in_comment
+    string:1:9: error: eof in comment
     ====
     //- /*
 
     -->
-    Eof_in_comment
+    string:2:0: error: eof in comment
     ====
     //- /* */
     -->
@@ -574,11 +570,11 @@ let%expect_test "line_start -> ignored_line -> ignored_block_comment" =
     ====
     //- /* //-
     -->
-    Eof_in_comment
+    string:1:10: error: eof in comment
     ====
     //- /* ignored_block_comment
     -->
-    Eof_in_comment
+    string:1:28: error: eof in comment
     ==== |}]
 
 let%expect_test "line_start -> ignored_line -> ignored_block_comment -> \
@@ -590,19 +586,19 @@ let%expect_test "line_start -> ignored_line -> ignored_block_comment -> \
     //- \
     //-
     -->
-    Eof_in_comment
+    string:1:18: error: eof in comment
     ====
     //- /* \
     //- \
 
     -->
-    Eof_in_comment
+    string:1:15: error: eof in comment
     ====
     //- /* \
     //-
 
     -->
-    Eof_in_comment
+    string:2:0: error: eof in comment
     ====
     //- /* \
     //- */
@@ -613,12 +609,12 @@ let%expect_test "line_start -> ignored_line -> ignored_block_comment -> \
     //- /* \
     //- //-
     -->
-    Eof_in_comment
+    string:1:16: error: eof in comment
     ====
     //- /* \
     //- ignored_block_comment
     -->
-    Eof_in_comment
+    string:1:34: error: eof in comment
     ==== |}]
 
 let%expect_test "line_start -> ignored_line -> ignored_block_comment -> \
@@ -646,7 +642,7 @@ let%expect_test "line_start -> ignored_line -> ignored_block_comment -> \
     ====
     //- /* */ /*
     -->
-    Eof_in_comment
+    string:1:12: error: eof in comment
     ====
     //- /* */ //
     -->
@@ -688,11 +684,11 @@ let%expect_test "line_start -> ignored_line -> ignored_block_comment -> \
     */ /*
     -->
      /*
-    */ /*Eof_in_comment
+    */ /*string:2:5: error: eof in comment
     ====
     //- /*
     */ empty_line
     -->
      /*
-    */ No_code_after_multi_line_block_comment
+    */ string:2:4: error: no code after multiline block comment
     ==== |}]

@@ -42,17 +42,14 @@ open Lexing
 ;;
 
 type err =
-  (* TODO add file name *)
   | Eof_in_comment
-  (* TODO add location *)
   | Eof_in_string
-  (* TODO add location *)
-  | Newline_in_string
-  (* TODO add location information *)
-  | No_code_after_multi_line_block_comment
+  | New_line_in_string
+  | No_code_after_multiline_block_comment
+[@@deriving show]
 ;;
 
-exception Error of err
+exception Error of err * Lexing.position
 ;;
 
 let rev_char_list str =
@@ -103,7 +100,7 @@ and kept_line write = parse
              kept_line write lexbuf }
 
 and kept_block_comment write = parse
-  | eof        { raise @@ Error Eof_in_comment }
+  | eof        { raise @@ Error (Eof_in_comment, lexbuf.lex_curr_p) }
   | '\n' ignor
   | '\n'       { newline kept_block_comment ~write lexbuf }
   | "*/"       { String.iter write (lexeme lexbuf) }
@@ -111,13 +108,13 @@ and kept_block_comment write = parse
                  kept_block_comment write lexbuf }
 
 and kept_str write = parse
-  | eof      { raise @@ Error Eof_in_string }
+  | eof      { raise @@ Error (Eof_in_string, lexbuf.lex_curr_p) }
   | esc_nl   { esc_newline kept_str ~write lexbuf }
   | '\\' '\\'
   | '\\' '"' { String.iter write (lexeme lexbuf);
                kept_str write lexbuf }
   | '"'      { write (lexeme_char lexbuf 0) }
-  | '\n'     { raise @@ Error Newline_in_string }
+  | '\n'     { raise @@ Error (New_line_in_string, lexbuf.lex_curr_p) }
   | _        { write (lexeme_char lexbuf 0);
                kept_str write lexbuf }
 
@@ -159,7 +156,7 @@ and commented_line write = parse
 
 (* in a block comment, with //- delete-able *)
 and ignored_block_comment lines_buf = parse
-  | eof    { raise @@ Error Eof_in_comment }
+  | eof    { raise @@ Error (Eof_in_comment, lexbuf.lex_curr_p) }
   (* weird, yes, but \ removal takes place _before_ comment recognition *)
   | esc_nl ignor
   | esc_nl { let (lines, buf) = lines_buf in
@@ -186,5 +183,5 @@ and empty_line write = parse
              empty_line write lexbuf }
   | ws     { String.iter write (lexeme lexbuf);
              empty_line write lexbuf }
-  | _      { raise @@ Error No_code_after_multi_line_block_comment }
+  | _      { raise @@ Error (No_code_after_multiline_block_comment, lexbuf.lex_curr_p) }
 

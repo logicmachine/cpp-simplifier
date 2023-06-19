@@ -127,8 +127,9 @@ all the tests. Additional options in `./test/run_test.py -h`.
 - [x] Support retaining relevant includes
 - [x] Make build system straightforward
 - [x] Input validation for top-level decls
+- [X] Source locations for comment-simplifier
 - [ ] Input validation for struct/union fields
-- [ ] Source locations for comment-simplifier
+- [ ] End-to-end tests
 - [ ] Update .travis.yml
 - [ ] Add licenses/headache for tests?
 - [ ] Use `ASTContext::getTypeInfo` to fill in missing struct fields

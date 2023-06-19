@@ -38,40 +38,60 @@
 (***************************************************************************)
 
 open Shexp_process
+module Cs = Comment_simplifier
+
+let proc_iter = List.iter
+
 module List = Stdlib.List
 
 let ( let* ) x f = bind ~f x
-let list_files dir = FileUtil.find Is_file dir (Fun.flip Stdlib.List.cons) []
+let ( >> ) = Infix.( >> )
+
+let rec filter_map f = function
+  | [] -> return []
+  | x :: xs -> (
+      let* result = f x in
+      match result with
+      | None -> filter_map f xs
+      | Some x ->
+          let* xs = filter_map f xs in
+          return (x :: xs))
+
+let list_files dir = FileUtil.find Is_file dir (Fun.flip List.cons) []
 
 let comment_simplify file =
   with_temp_file ~prefix:"c-tree-carve-" ~suffix:".txt" (fun tmp_file ->
-      Comment_simplifier.from_file ~tmp_file file;
-      FileUtil.cp [ tmp_file ] file;
-      return ())
+      match Cs.from_file ~tmp_file file with
+      | Result.Ok () ->
+          FileUtil.cp [ tmp_file ] file;
+          return None
+      | Result.Error (reason, pos) -> return (Some (reason, pos)))
 
 let fixup output =
   Str.(
     global_replace
       (regexp "clang-tree-carve\\(\\.exe\\)?")
-      "c-tree-carve" output)
+      (FilePath.basename Sys.executable_name)
+      output)
+
+let dir_exists dir = try Sys.is_directory dir with _ -> false
 
 let prog =
   let args = Array.to_list Sys.argv in
-  let* exit_code, output =
-    run_exit_code "clang-tree-carve.exe" (Stdlib.List.tl args)
-    |> capture [ Std_io.Stdout; Std_io.Stderr ]
+  let* (exit_code, stdout), stderr =
+    run_exit_code "clang-tree-carve.exe" (List.tl args)
+    |> capture [ Std_io.Stdout ] |> capture [ Std_io.Stderr ]
   in
-  if exit_code <> 0 then
-    let* () = eprint @@ fixup output in
-    return 1
-  else if try FileUtil.test Is_dir output with _ -> false then
-    let* () =
-      Shexp_process.List.iter ~f:comment_simplify @@ list_files output
-    in
-    let* () = echo ~n:() output in
-    return 0
+  eprint @@ fixup stderr
+  >>
+  if exit_code <> 0 then return exit_code
+  else if not @@ dir_exists stdout then echo ~n:() (fixup stdout) >> return 0
   else
-    let* () = echo ~n:() (fixup output) in
-    return 0
+    let* errs = filter_map comment_simplify @@ list_files stdout in
+    match errs with
+    | [] -> echo ~n:() stdout >> return 0
+    | _ :: _ ->
+        proc_iter errs ~f:(fun (r, p) -> eprint @@ Cs.format_err r p)
+        >> return 1
 
 let () = exit @@ eval ~context:(Context.create ()) prog

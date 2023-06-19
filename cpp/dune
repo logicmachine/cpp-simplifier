@@ -15,9 +15,12 @@
      cmake_generator.txt
      (run
       cmake
-      -D CMAKE_BUILD_TYPE=%{read:cmake_build_type.txt}
-      -S src
-      -B _build))
+      -D
+      CMAKE_BUILD_TYPE=%{read:cmake_build_type.txt}
+      -S
+      src
+      -B
+      _build))
     (with-stdout-to
      cmake_build.txt
      (run cmake --build _build))
