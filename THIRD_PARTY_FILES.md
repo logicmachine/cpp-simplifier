@@ -1,8 +1,11 @@
 The following parts of c-tree-carver contain new code released under the
 BSD 2-Clause License:
-* `cpp/src/debug.hpp`
-* `lib`
 * `bin`
+* `cpp/src/debug.hpp`
+* `cpp/src/debug_printers.cpp`
+* `cpp/src/debug_printers.hpp`
+* `cpp/src/source_range_hash.hpp`
+* `lib`
 * `test`
 
 Copyright (c) 2022 Dhruv Makwana
