@@ -64,7 +64,7 @@ let prog =
   if exit_code <> 0 then
     let* () = eprint @@ fixup output in
     return 1
-  else if FilePath.is_valid output then
+  else if try FileUtil.test Is_dir output with _ -> false then
     let* () =
       Shexp_process.List.iter ~f:comment_simplify @@ list_files output
     in
