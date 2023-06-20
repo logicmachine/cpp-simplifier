@@ -110,6 +110,20 @@ c-tree-carve --help
 *YOU MUST HAVE A `compile_commands.json` FILE IN YOUR SOURCE DIRECTORY.*
 Futhermore, it must use *relative* paths.
 
+```
+cd cpp
+./test/run_test.py make # make compile_commands.json file
+c-tree-carve test/array/array_initialiser.in.c
+```
+
+| Option              | Meaning |
+|---------------------|---------|
+| `-d`                | Output program debug info to stderr. |
+| `-n num`            | Choose a command (`compile_commands.json` can have more than one command per file) |
+| `-r func1,..,funcn` | Choose traversal root functions from file (defaults to all) |
+
+The remaining options are from [Clang's
+CommonOptionParser](https://clang.llvm.org/doxygen/classclang_1_1tooling_1_1CommonOptionsParser.html#details).
 
 ## Running Tests
 
@@ -132,6 +146,7 @@ all the tests. Additional options in `./test/run_test.py -h`.
 - [x] Make build system straightforward
 - [x] Input validation for top-level decls
 - [X] Source locations for comment-simplifier
+- [ ] Update `conf-clang-12.opam.template` to handle more distributions
 - [ ] Input validation for struct/union fields
 - [ ] End-to-end tests
 - [ ] Update .travis.yml

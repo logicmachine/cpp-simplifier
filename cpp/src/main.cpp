@@ -112,14 +112,17 @@ cl::OptionCategory simplifier_category("clang-tree-carve options");
 cl::opt<std::optional<unsigned>, false, UnsignedOptParser>
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
     commandOpt("n", cl::desc("For multiple commands, choose one of them"),
-               cl::init(std::optional<unsigned>()), cl::cat(simplifier_category));
+               cl::value_desc("num"), cl::init(std::optional<unsigned>()),
+               cl::cat(simplifier_category));
 
+// clang-format off
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables, cppcoreguidelines-interfaces-global-init)
 cl::extrahelp common_help(tl::CommonOptionsParser::HelpMessage);
+// clang-format on
 
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
-cl::list<std::string> roots("r", cl::desc("Specify root function"), cl::value_desc("func"),
-                            cl::cat(simplifier_category));
+cl::list<std::string> roots("r", cl::desc("Specify root functions"), cl::value_desc("func1,..,funcn"),
+                            cl::CommaSeparated, cl::cat(simplifier_category));
 
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 bool debugOn;
