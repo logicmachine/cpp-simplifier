@@ -107,10 +107,14 @@ opam install .
 c-tree-carve --help
 ```
 
+*YOU MUST HAVE A `compile_commands.json` FILE IN YOUR SOURCE DIRECTORY.*
+Futhermore, it must use *relative* paths.
+
+
 ## Running Tests
 
 ```
-cd cpp && ./test/run_test.py make && ./test/run_test.py for
+dune runtest && cd cpp && ./test/run_test.py make && ./test/run_test.py for
 ```
 
 This makes a `compile_commands.json` file for all the test inputs and then runs

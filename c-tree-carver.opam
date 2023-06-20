@@ -7,11 +7,15 @@ authors: ["Dhruv Makwana <dhruv.makwana@cl.cam.ac.uk"]
 license: ["MIT" "BSD-2-Clause"]
 tags: ["topics" "c" "clang" "tool" "tree-carving"]
 homepage: "https://github.com/rems-project/c-tree-carver"
-doc: "https://url/to/documentation"
 bug-reports: "https://github.com/rems-project/c-tree-carver/issues"
 depends: [
+  "dune" {>= "3.7"}
   "ocaml" {>= "4.12.0"}
-  "dune" {>= "3.7" & >= "3.7.0"}
+  "conf-c++"
+  "conf-clang-12"
+  "conf-cmake" {dev}
+  "conf-llvm" {= "12.0.1"}
+  "conf-python3" {with-test}
   "fileutils" {>= "0.6.4"}
   "shexp" {>= "v0.15.0"}
   "ocamlformat" {>= "0.25.1" & dev}

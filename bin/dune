@@ -1,4 +1,5 @@
 (executable
+ (package c-tree-carver)
  (public_name c-tree-carve)
  (name main)
  (libraries str comment_simplifier shexp.process fileutils))

@@ -114,8 +114,7 @@ cl::opt<std::optional<unsigned>, false, UnsignedOptParser>
     commandOpt("n", cl::desc("For multiple commands, choose one of them"),
                cl::init(std::optional<unsigned>()), cl::cat(simplifier_category));
 
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables,
-// cppcoreguidelines-interfaces-global-init)
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables, cppcoreguidelines-interfaces-global-init)
 cl::extrahelp common_help(tl::CommonOptionsParser::HelpMessage);
 
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)

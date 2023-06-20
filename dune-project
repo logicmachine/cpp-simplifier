@@ -13,7 +13,7 @@
 
 (license MIT BSD-2-Clause)
 
-(documentation https://url/to/documentation)
+; (documentation https://url/to/documentation)
 
 (package
  (name c-tree-carver)
@@ -21,13 +21,23 @@
  (description "")
  (depends
      (ocaml (>= 4.12.0))
-     (dune (>= 3.7.0))
+     conf-c++
+     conf-clang-12
+     (conf-cmake :dev)
+     (conf-llvm (= 12.0.1))
+     (conf-python3 :with-test)
      (fileutils (>= 0.6.4))
      (shexp (>= v0.15.0))
      (ocamlformat (and (>= 0.25.1) :dev))
      (ppx_expect (and (>= v0.15.1) :with-test)))
+
  (tags
   (topics c clang tool tree-carving)))
+
+(package
+ (name conf-clang-12)
+ (allow_empty))
+
 
 (formatting)
 
