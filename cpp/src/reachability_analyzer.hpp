@@ -91,6 +91,7 @@
 #include <sstream>
 #include <unordered_set>
 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class PPRecordNested : public clang::PPCallbacks {
   public:
     using RangeToSet = std::unordered_map<clang::SourceRange, SourceRangeSet, SourceRangeHash>;
@@ -150,9 +151,11 @@ class PPRecordNested : public clang::PPCallbacks {
                 macro_info->getReplacementToken(macro_info->getNumTokens() - 1);
             m_range_hack[orig] = clang::SourceRange(
                 orig.getBegin(),
+                // NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions)
                 last_token.getLocation().getLocWithOffset(last_token.getLength() - 1));
         } else {
             m_range_hack[orig] = clang::SourceRange(
+                // NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions)
                 orig.getBegin(), orig.getBegin().getLocWithOffset(Id.getLength() - 1));
         }
     }

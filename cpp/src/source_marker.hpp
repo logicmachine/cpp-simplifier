@@ -147,6 +147,7 @@ class SourceMarker {
 
     clang::SourceLocation PreviousLine(const clang::SourceLocation &loc) {
         const auto col = sm.getPresumedColumnNumber(loc);
+        // NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions)
         return loc.getLocWithOffset(-col);
     }
 

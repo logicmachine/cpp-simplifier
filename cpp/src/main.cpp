@@ -74,8 +74,6 @@
 /*  SOFTWARE.                                                                       */
 /************************************************************************************/
 
-// clang-format on
-
 #include "simplifier.hpp"
 #include <clang/Frontend/FrontendActions.h>
 #include <clang/Tooling/CommonOptionsParser.h>
@@ -88,11 +86,11 @@
 #include <sstream>
 #include <string>
 
+// clang-format on
+
 namespace fs = std::filesystem;
 namespace cl = llvm::cl;
 namespace tl = clang::tooling;
-
-cl::OptionCategory simplifier_category("clang-tree-carve options");
 
 struct UnsignedOptParser : public cl::parser<std::optional<unsigned>> {
     UnsignedOptParser(cl::Option &o) : cl::parser<std::optional<unsigned>>(o){};
@@ -100,7 +98,7 @@ struct UnsignedOptParser : public cl::parser<std::optional<unsigned>> {
     static bool parse(cl::Option &o, llvm::StringRef arg_name, llvm::StringRef &arg,
                       std::optional<unsigned> &val) {
         cl::parser<unsigned> tmp(o);
-        unsigned out;
+        unsigned out = 0;
         const auto try_parse = tmp.parse(o, arg_name, arg, out);
         if (!try_parse)
             val = out;
@@ -108,14 +106,26 @@ struct UnsignedOptParser : public cl::parser<std::optional<unsigned>> {
     }
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+cl::OptionCategory simplifier_category("clang-tree-carve options");
+
 cl::opt<std::optional<unsigned>, false, UnsignedOptParser>
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
     commandOpt("n", cl::desc("For multiple commands, choose one of them"),
                cl::init(std::optional<unsigned>()), cl::cat(simplifier_category));
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables,
+// cppcoreguidelines-interfaces-global-init)
 cl::extrahelp common_help(tl::CommonOptionsParser::HelpMessage);
+
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 cl::list<std::string> roots("r", cl::desc("Specify root function"), cl::value_desc("func"),
                             cl::cat(simplifier_category));
+
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 bool debugOn;
+
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 cl::opt<bool, true> debugOpt("d", cl::desc("Enable debug output on stderr"), cl::location(debugOn),
                              cl::cat(simplifier_category));
 

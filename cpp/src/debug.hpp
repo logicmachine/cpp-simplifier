@@ -46,13 +46,14 @@
 // This should probably not be referenced directly, instead, use the DEBUG macro
 // below.
 
-extern bool debugOn;
+extern bool debugOn; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 // CTC_DEBUG macro - This macro should be used by code to emit debug
 // information. In the '-d' option is specified on the command line, and if this
 // is a debug build, then the code specified as the option to the macro will be
 // executed.  Otherwise it will not be.
 // clang-format off
+// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
 #define CTC_DEBUG(X) \
     do { if (debugOn) { X; } } while (0)
 // clang-format on

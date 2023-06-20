@@ -40,6 +40,7 @@
 
 // clang-format on
 #include <clang/Basic/SourceLocation.h>
+#include <climits>
 #include <unordered_set>
 
 #pragma once
@@ -47,7 +48,7 @@
 struct SourceRangeHash {
     size_t operator()(const clang::SourceRange &range) const {
         size_t result = std::hash<unsigned>()(range.getBegin().getRawEncoding());
-        result <<= sizeof(unsigned) * 8;
+        result <<= sizeof(unsigned) * CHAR_BIT;
         result |= std::hash<unsigned>()(range.getEnd().getRawEncoding());
         return result;
     }

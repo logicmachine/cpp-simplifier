@@ -314,8 +314,8 @@ class Traverser {
         // the definition the reference points to
         traverse(expr->getDecl(), depth);
         // template argument
-        for (unsigned int i = 0; i < expr->getNumTemplateArgs(); ++i) {
-            traverse(expr->getTemplateArgs()[i], depth);
+        for (const auto &arg : expr->template_arguments()) {
+            traverse(arg, depth);
         }
         if (expr->hasQualifier()) {
             traverse(expr->getQualifier(), depth);
@@ -325,8 +325,8 @@ class Traverser {
         // member defintion
         traverse(expr->getMemberDecl(), depth);
         // template argument
-        for (unsigned int i = 0; i < expr->getNumTemplateArgs(); ++i) {
-            traverse(expr->getTemplateArgs()[i], depth);
+        for (const auto &arg : expr->template_arguments()) {
+            traverse(arg, depth);
         }
     }
     void down_casted(const clang::InitListExpr *expr, int depth) {
@@ -469,8 +469,8 @@ class Traverser {
         const auto t = type->getTemplateName();
         traverse(t.getAsTemplateDecl(), depth);
         // template argument
-        for (unsigned int i = 0; i < type->getNumArgs(); ++i) {
-            traverse(type->getArgs()[i], depth);
+        for (const auto &arg : *type) {
+            traverse(arg, depth);
         }
     }
     void down_casted(const clang::ElaboratedType *type, int depth) {
@@ -488,6 +488,7 @@ class Traverser {
         case clang::NestedNameSpecifier::TypeSpec:
         case clang::NestedNameSpecifier::TypeSpecWithTemplate:
             traverse(spec->getAsType(), depth);
+        default:
             break;
         }
         if (spec->getPrefix()) {
@@ -514,6 +515,8 @@ class Traverser {
         case clang::TemplateArgument::Integral:
             traverse(arg_loc.getSourceIntegralExpression(), depth);
             break;
+        default:
+            break;
         }
     }
 
@@ -531,6 +534,8 @@ class Traverser {
             break;
         case clang::TemplateArgument::NullPtr:
             traverse(arg.getNullPtrType(), depth);
+            break;
+        default:
             break;
         }
     }
