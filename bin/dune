@@ -2,4 +2,12 @@
  (package c-tree-carver)
  (public_name c-tree-carve)
  (name main)
+ (modules main)
  (libraries str comment_simplifier shexp.process fileutils))
+
+(executable
+ (package c-tree-carver)
+ (public_name comment-carve)
+ (name comment_carve)
+ (modules comment_carve)
+ (libraries comment_simplifier))
