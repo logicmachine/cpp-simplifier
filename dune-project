@@ -29,6 +29,7 @@
      (fileutils (>= 0.6.4))
      (shexp (>= v0.15.0))
      (ocamlformat (and (>= 0.25.1) :dev))
+     (ppx_expect (and (>= 5.2.1)))
      (ppx_expect (and (>= v0.15.1) :with-test)))
 
  (tags

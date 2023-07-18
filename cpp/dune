@@ -21,7 +21,7 @@
       src
       -B
       _build))
-    (with-stdout-to
+    (with-outputs-to
      cmake_build.txt
      (run cmake --build _build))
     (copy _build/clang-tree-carve clang-tree-carve.exe)))))
