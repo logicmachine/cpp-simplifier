@@ -88,6 +88,7 @@
 #include <clang/Tooling/Tooling.h>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <sstream>
 #include <unordered_set>
 
