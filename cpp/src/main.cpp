@@ -131,16 +131,18 @@ bool debugOn;
 cl::opt<bool, true> debugOpt("d", cl::desc("Enable debug output on stderr"), cl::location(debugOn),
                              cl::cat(simplifier_category));
 
-static const std::regex clang13_only_flags("|-Wno-unused-but-set-variable"
-                                           "|-mstack-protector-guard=sysreg"
-                                           "|-mstack-protector-guard-reg=sp_el0"
-                                           "|-mstack-protector-guard-offset=1272");
+static const std::regex newer_clang_flags("|-Wno-unused-but-set-variable"
+                                          "|-Wcast-function-type"
+                                          "|-Wno-unaligned-access"
+                                          "|-mstack-protector-guard=sysreg"
+                                          "|-mstack-protector-guard-reg=sp_el0"
+                                          "|-mstack-protector-guard-offset=1272");
 
 static tl::CommandLineArguments remove_clang13_only_flags(const tl::CommandLineArguments &args,
                                                           llvm::StringRef filename) {
     tl::CommandLineArguments result(args.size());
     std::copy_if(args.begin(), args.end(), result.begin(),
-                 [](const std::string &s) { return !std::regex_match(s, clang13_only_flags); });
+                 [](const std::string &s) { return !std::regex_match(s, newer_clang_flags); });
     result.push_back("-Xclang");
     result.push_back("-detailed-preprocessing-record");
     return result;
