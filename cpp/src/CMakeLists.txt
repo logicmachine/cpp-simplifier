@@ -37,7 +37,7 @@
 #  SUCH DAMAGE.                                                           #
 ###########################################################################
 
-# This is helpful: https://alereinking.com/blog/how-to-use-cmake-without-the-agonizing-pain-part-1.html
+# This is helpful: https://alexreinking.com/blog/how-to-use-cmake-without-the-agonizing-pain-part-1.html
 
 cmake_minimum_required(VERSION 3.16.3)
 project(clang-tree-carver)
